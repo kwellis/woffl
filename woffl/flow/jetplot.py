@@ -298,7 +298,7 @@ class JetBook:
         )
         axs[3].ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
         axs[3].axhline(y=0, linestyle="--", linewidth=1, color=colors[7])
-        axs[3].set_ylabel("$dE_{te}$, $ft^{2}/s^{2}$")
+        axs[3].set_ylabel("$E_{te}$, $ft^{2}/s^{2}$")
         axs[3].set_xlabel("Throat Entry Pressure, psig")
         plt.subplots_adjust(left=0.13, bottom=0.075, right=0.975, top=0.99, wspace=0.2, hspace=0.1)
         return fig, axs
@@ -657,7 +657,7 @@ def multi_suction_graphs(qoil_list: list, book_list: list, fig_path: str | os.Pa
     mach_annotate(mach_x, mach_y)
     inflow_annotate(ipr_x, ipr_y)
     ax.set_xlabel("Throat Entry Pressure, psig")
-    ax.set_ylabel("$dE_{te}$, $ft^{2}/s^{2}$")
+    ax.set_ylabel("$E_{te}$, $ft^{2}/s^{2}$")
     ax.axhline(y=0, linestyle="--", linewidth=1, color="#7f7f7f")  # grey color from tab10
     ax.legend(loc="lower right")
     plt.subplots_adjust(left=0.2, bottom=0.135, right=0.975, top=0.975, wspace=0.2, hspace=0.15)

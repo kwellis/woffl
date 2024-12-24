@@ -530,7 +530,7 @@ def batch_plot_data(
 
     ax.set_xlabel(f"{water.capitalize()} Water Rate, BWPD")
     ax.set_ylabel("Produced Oil Rate, BOPD")
-    ax.title.set_text(f"{wellname} Jet Pump Performance")
+    # ax.title.set_text(f"{wellname} Jet Pump Performance")
     ax.legend()
 
     return None
