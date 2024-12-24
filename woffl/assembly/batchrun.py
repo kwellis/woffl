@@ -298,7 +298,7 @@ class BatchPump:
 
         if hold is None:
             if fig_path is not None:
-                plt.savefig(fig_path, dpi=300)
+                plt.savefig(fig_path, dpi=300, bbox_inches="tight")
             else:
                 plt.show()
 
