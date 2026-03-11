@@ -129,10 +129,10 @@ batch_results_plot(df["qoil_std"], df["total_water"], df["nozzle"], df["throat"]
 
 ## Background
 
-If the reader is interested in the physics and numerical modeling that went into woffl they should read the papers that are listed below. The paper by Merrill provies a good introduction to the basic method that is used. Cunningham set much of the foundational equations that are used in the modeling. The authors intend to publish a paper with a more detailed explanation in the future.
+If the reader is interested in the physics and numerical modeling that went into woffl they should read the papers that are listed below. The conference paper and project by Kaelin Ellis provide a discussion on the numerical analysis and history of jet pumps in oil wells. Cunningham set much of the foundational equations that are used in the modeling.
 
 ### Relevant Papers   
 - Cunningham, R. G., 1974, “Gas Compression With the Liquid Jet Pump,” ASME J Fluids Eng, 96(3), pp. 203–215.
 - Cunningham, R. G., 1995, “Liquid Jet Pumps for Two-Phase Flows,” ASME J Fluids Eng, 117(2), pp. 309–316.
-- Merrill, R., Shankar, V., and Chapman, T., 2020, “Three-Phase Numerical Solution for Jet Pumps Applied to a Large Oilfield,” SPE-202928-MS, November 10, 2020.
+- Ellis, K., Awoleke, O., 2025, “Optimizing Power Fluid in Jet Pump Oil Wells,” SPE-224132-MS, April 25, 2025.
 - Himr, D., Habán, V., Pochylý, F., 2009, "Sound Speed in the Mixture Water - Air," Engineering Mechanics, Svratka, Czech Republic, May 11–14, 2009, Paper 255, pp. 393-401. 
