@@ -13,7 +13,7 @@ from woffl.pvt.formwat import FormWater
 from woffl.pvt.resmix import ResMix
 
 # data from MPU E-41 Well Test on 11/27/2023
-# only works if the command python -m tests.e41_test is used
+# only works if the command python -m examples.e41 is used
 
 surf_pres = 210
 jpump_tvd = 4065  # feet, interpolated off well profile

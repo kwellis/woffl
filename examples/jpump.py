@@ -14,7 +14,7 @@ from woffl.pvt.formwat import FormWater
 from woffl.pvt.resmix import ResMix
 
 # data from MPU E-41 Well Test on 11/27/2023
-# only works if the command python -m tests.jpump_test is used
+# only works if the command python -m examples.jpump is used
 
 pwh = 210
 rho_pf = 62.4  # lbm/ft3

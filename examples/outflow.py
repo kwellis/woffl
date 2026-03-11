@@ -6,7 +6,7 @@ from woffl.geometry.pipe import Pipe
 from woffl.geometry.wellprofile import WellProfile
 from woffl.pvt import BlackOil, FormGas, FormWater, ResMix
 
-# only works if the command python -m tests.outflow_test is used
+# only works if the command python -m examples.outflow is used
 # mirror the hysys stuff
 md_list = np.linspace(0, 6000, 100)
 vd_list = np.linspace(0, 4000, 100)
