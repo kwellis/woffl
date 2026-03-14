@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import woffl.flow.outflow as of
-from woffl.geometry.pipe import Pipe
+from woffl.geometry.pipe import Pipe, PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
 from woffl.pvt import BlackOil, FormGas, FormWater, ResMix
 
@@ -22,11 +22,13 @@ qoil_std = 100  # stbopd
 test_prop = ResMix(form_wc, form_gor, mpu_oil, mpu_wat, mpu_gas)
 wellprof = WellProfile(md_list, vd_list, 6000)
 tubing = Pipe(out_dia=4.5, thick=0.5)
+casing = Pipe.seven_case()
+wellbore = PipeInPipe(tubing, casing)
 
 ptop = 350  # psig
 ttop = 100  # deg f
 
-md_seg, prs_ray, slh_ray = of.top_down_press(ptop, ttop, qoil_std, test_prop, tubing, wellprof)
+md_seg, prs_ray, slh_ray = of.top_down_press(ptop, ttop, qoil_std, test_prop, wellbore, wellprof)
 
 slh_ray = np.append(slh_ray, np.nan)  # add a nan to make same length for graphing
 fig, ax1 = plt.subplots()
