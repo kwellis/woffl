@@ -28,7 +28,7 @@ wellbore = PipeInPipe(tubing, casing)
 ptop = 350  # psig
 ttop = 100  # deg f
 
-md_seg, prs_ray, slh_ray = of.top_down_press(ptop, ttop, qoil_std, test_prop, wellbore, wellprof)
+md_seg, prs_ray, slh_ray = of.production_top_down_press(ptop, ttop, qoil_std, test_prop, wellbore, wellprof)
 
 slh_ray = np.append(slh_ray, np.nan)  # add a nan to make same length for graphing
 fig, ax1 = plt.subplots()

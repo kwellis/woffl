@@ -38,7 +38,7 @@ class ResMix:
 
     def __repr__(self) -> str:
         # return(f'Mixture with {self.oil.oil_api} API Oil')
-        return f"Mixture at {100*self.wc}% Watercut and {self.fgor} SCF/STB FGOR"
+        return f"Mixture at {100 * self.wc}% Watercut and {self.fgor} SCF/STB FGOR"
 
     def condition(self, press: float, temp: float):
         """Set condition of evaluation

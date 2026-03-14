@@ -9,9 +9,9 @@ import numpy as np
 from woffl.flow import singlephase as sp
 from woffl.flow import twophase as tp
 from woffl.geometry import forms as fm
-from woffl.geometry.pipe import Pipe, PipeInPipe
+from woffl.geometry.pipe import PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
-from woffl.pvt.resmix import ResMix
+from woffl.pvt import FormWater, ResMix
 
 
 def homo_diff_press(
@@ -43,7 +43,8 @@ def homo_diff_press(
         prop (ResMix): Properties of Fluid Mixture in Wellbore, ResMix
 
     Returns:
-        dp (float): Differential Pressure, psid
+        dp_stat (float): Static Differential Pressure, psid
+        dp_fric (float): Friction Differential Pressure, psid
         nslh (float): No Slip Liquid Holdup, unitless
     """
     prop = prop.condition(pin, tin)
@@ -128,7 +129,7 @@ def beggs_diff_press(
     return dp_stat, dp_fric, slh
 
 
-def top_down_press(
+def production_top_down_press(
     ptop: float,
     ttop: float,
     qoil_std: float,
@@ -138,7 +139,7 @@ def top_down_press(
     flowpath: str = "tubing",
     model: str = "beggs",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Top Down WellBore Pressure Calculation
+    """Production Top Down WellBore Pressure Calculation
 
     Uses the specificed model to calculate the pressure gradient in a wellbore, starting
     at the top and working down to inflow / jet pump node. This is the preferred method
@@ -190,7 +191,7 @@ def top_down_press(
     return md_seg, prs_ray, slh_ray
 
 
-def bottom_up_press(
+def production_bottom_up_press(
     pbot: float,
     tbot: float,
     qoil_std: float,
@@ -250,3 +251,59 @@ def bottom_up_press(
     # the no slip array is going to be one shorter than the md_seg and prs_ray...
     # i'm not sure if this is problem that I should "fix" later?
     return md_seg, prs_ray, slh_ray
+
+
+def powerfluid_top_down_press(
+    ptop: float,
+    ttop: float,
+    qwat_bpd: float,
+    prop: FormWater,  # update later to accept deadoil? need to integrate with resmix
+    wellbore: PipeInPipe,
+    wellprof: WellProfile,
+    flowpath: str = "annulus",
+) -> tuple[float, float]:
+    """Power Fluid Top Down Pressure Calculation
+
+    Used for calculating pressure drop in the annlus (reverse circulating) or
+    in the tubing (forward circulating) depennding on flow path. Prop is the
+    power fluid properties, which is FormWater class, but really is just water.
+
+    Args:
+        ptop (float): Pressure at top node, psig
+        ttop (float): Temperature at top node, deg F
+        qwat_bpd (float): Water Rate, BWPD
+        prop (FormWater): Poperties of Power Fluid
+        wellbore (PipeInPipe): Piping geometry inside the wellbore, PipeInPipe
+        wellprof (WellProfile): survey dimensions and location of jet pump, WellProfile
+        flowpath (str): Where the flow is occuring, either tubing or annulus
+
+    Returns:
+        dp_stat (float): Static Differential Pressure, psid
+        dp_fric (float): Friction Differntial Pressure, psid
+    """
+    flow_path_list = ["tubing", "annulus"]
+    if flowpath not in flow_path_list:
+        raise ValueError(f"{flowpath} not recognized, select from {flow_path_list}")
+    if flowpath == "tubing":
+        hyd_dia = wellbore.tube_hyd_dia
+        area = wellbore.tube_area
+        abs_ruff = wellbore.tube_abs_ruff
+    else:
+        hyd_dia = wellbore.ann_hyd_dia
+        area = wellbore.ann_area
+        abs_ruff = wellbore.ann_abs_ruff
+
+    # height, positive is up?
+    length = wellprof.jetpump_md  # distance down wellbore to jet pump
+    height = wellprof.jetpump_vd  # depth down wellbore to jet pump
+
+    prop = prop.condition(ptop, ttop)
+    qwat_fts = sp.bpd_to_ft3s(qwat_bpd)
+    vel = sp.velocity(qwat_fts, area)
+    NRe = sp.reynolds(prop.density, vel, hyd_dia, prop.viscosity())  # need to refactor PVT...
+    rel_ruff = sp.relative_roughness(hyd_dia, abs_ruff)
+    ff = sp.ffactor_darcy(NRe, rel_ruff)
+
+    dp_fric = sp.diff_press_friction(ff, prop.density, vel, hyd_dia, length)
+    dp_stat = sp.diff_press_static(prop.density, -1 * height)  # power fluid goes down
+    return dp_stat, dp_fric
