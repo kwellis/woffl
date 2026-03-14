@@ -9,7 +9,7 @@ import numpy as np
 from woffl.flow import singlephase as sp
 from woffl.flow import twophase as tp
 from woffl.geometry import forms as fm
-from woffl.geometry.pipe import Annulus, Pipe
+from woffl.geometry.pipe import Pipe, PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
 from woffl.pvt.resmix import ResMix
 

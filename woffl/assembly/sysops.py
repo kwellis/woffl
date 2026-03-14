@@ -10,7 +10,7 @@ from woffl.flow import InFlow
 from woffl.flow import jetflow as jf
 from woffl.flow import outflow as of
 from woffl.flow import singlephase as sp
-from woffl.geometry import Annulus, JetPump, Pipe, WellProfile
+from woffl.geometry import JetPump, Pipe, PipeInPipe, WellProfile
 from woffl.pvt.resmix import ResMix
 
 

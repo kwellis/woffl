@@ -19,7 +19,7 @@ import woffl.assembly.curvefit as cf
 import woffl.assembly.sysops as so
 from woffl.flow.inflow import InFlow
 from woffl.geometry.jetpump import JetPump
-from woffl.geometry.pipe import Annulus, Pipe
+from woffl.geometry.pipe import Pipe, PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
 from woffl.pvt.resmix import ResMix
 

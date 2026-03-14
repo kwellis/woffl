@@ -1,11 +1,11 @@
 import woffl.flow.singlephase as sp
-from woffl.geometry.pipe import Annulus
+from woffl.geometry.pipe import PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
 from woffl.pvt.formwat import FormWater
 
 
 def top_down_press(
-    ptop: float, ttop: float, qwat_bpd: float, prop_pf: FormWater, annul: Annulus, wellprof: WellProfile
+    ptop: float, ttop: float, qwat_bpd: float, prop_pf: FormWater, annul: PipeInPipe, wellprof: WellProfile
 ) -> float:
     """Top Down Annulus Pressure Calculation
 
