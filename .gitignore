@@ -8,6 +8,10 @@ i15_debug.py
 b35_debug.py
 random_debug.py
 
+# specific folders
+/.claude
+
+
 # Editors
 .vscode/
 .idea/
