@@ -300,7 +300,7 @@ def powerfluid_top_down_press(
     prop = prop.condition(ptop, ttop)
     qwat_fts = sp.bpd_to_ft3s(qwat_bpd)
     vel = sp.velocity(qwat_fts, area)
-    NRe = sp.reynolds(prop.density, vel, hyd_dia, prop.viscosity())  # need to refactor PVT...
+    NRe = sp.reynolds(prop.density, vel, hyd_dia, prop.viscosity())  # need to refactor properties
     rel_ruff = sp.relative_roughness(hyd_dia, abs_ruff)
     ff = sp.ffactor_darcy(NRe, rel_ruff)
 
