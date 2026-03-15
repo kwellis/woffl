@@ -222,7 +222,7 @@ def discharge_check(
     )
     vtm, pdi = jf.diffuser_discharge(ptm, form_temp, jpump_well.kdi, jpump_well.ath, tube.inn_area, qoil_std, prop_tm)
 
-    md_seg, prs_ray, slh_ray = of.top_down_press(surf_pres, form_temp, qoil_std, prop_tm, tube, wellprof)
+    md_seg, prs_ray, slh_ray = of.production_top_down_press(surf_pres, form_temp, qoil_std, prop_tm, tube, wellprof)
 
     outflow_pdi = prs_ray[-1]
     diff_pdi = pdi - outflow_pdi
