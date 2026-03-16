@@ -14,7 +14,7 @@ from woffl.pvt.formwat import FormWater
 from woffl.pvt.resmix import ResMix
 
 # data from MPU E-41 Well Test on 11/27/2023
-# only works if the command python -m examples.jpump is used
+# only works if the command python -m examples.e41_direction is used
 
 # turn this file into a comparison of reverse and forward circulating jet pumps?
 
