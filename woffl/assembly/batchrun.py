@@ -21,7 +21,7 @@ from woffl.flow.inflow import InFlow
 from woffl.geometry.jetpump import JetPump
 from woffl.geometry.pipe import Pipe, PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
-from woffl.pvt.resmix import ResMix
+from woffl.pvt import FormWater, ResMix
 
 
 @dataclass(frozen=True)
@@ -46,12 +46,13 @@ class BatchPump:
         self,
         pwh: float,
         tsu: float,
-        rho_pf: float,
         ppf_surf: float,
-        wellbore: Pipe,
+        wellbore: PipeInPipe,
         wellprof: WellProfile,
         ipr_su: InFlow,
         prop_su: ResMix,
+        prop_pf: FormWater,
+        jpump_direction: str = "reverse",
         wellname: str = "na",
     ) -> None:
         """Batch Pump Solver
@@ -62,21 +63,24 @@ class BatchPump:
         Args:
             pwh (float): Pressure Wellhead, psig
             tsu (float): Temperature Suction, deg F
-            rho_pf (float): Density of the power fluid, lbm/ft3
             ppf_surf (float): Pressure Power Fluid Surface, psig
-            wellbore (Pipe): Pipe Class of the Wellbore
+            wellbore (PipeInPipe): Pipe Class of the Wellbore
             wellprof (WellProfile): Well Profile Class
             ipr_su (InFlow): Inflow Performance Class
-            prop_su (ResMix): Reservoir Mixture Conditions
+            prop_su (ResMix): Reservoir Mixture Properties
+            prop_pf (FormWater): Powerfluid Properties
+            jpump_direction (str): Jet Pump Direction, "reverse" or "forward"
+            wellname (str): A unique identifier of the wellname
         """
         self.pwh = pwh
         self.tsu = tsu
-        self.rho_pf = rho_pf
         self.ppf_surf = ppf_surf
         self.wellbore = wellbore
         self.wellprof = wellprof
         self.ipr_su = ipr_su
         self.prop_su = prop_su
+        self.prop_pf = prop_pf
+        self.direction = jpump_direction
         self.wellname = wellname
 
     def update_press(self, kind: str, psig: float) -> None:
@@ -150,13 +154,14 @@ class BatchPump:
                 psu_solv, sonic_status, qoil_std, fwat_bpd, lwat_bpd, mach_te = so.jetpump_solver(
                     self.pwh,
                     self.tsu,
-                    self.rho_pf,
                     self.ppf_surf,
                     jetpump,
                     self.wellbore,
                     self.wellprof,
                     self.ipr_su,
                     self.prop_su,
+                    self.prop_pf,
+                    self.direction,
                 )
                 result = {
                     "nozzle": jetpump.noz_no,

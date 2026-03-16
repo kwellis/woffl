@@ -16,6 +16,8 @@ from woffl.pvt.resmix import ResMix
 # data from MPU E-41 Well Test on 11/27/2023
 # only works if the command python -m examples.jpump is used
 
+# turn this file into a comparison of reverse and forward circulating jet pumps?
+
 pwh = 210
 rho_pf = 62.4  # lbm/ft3
 ppf_surf = 3168  # psi, power fluid surf pressure

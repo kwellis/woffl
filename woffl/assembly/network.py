@@ -284,7 +284,7 @@ class WellNetwork:
 
         leg_nms = pri + sec
         labs = [leg.get_label() for leg in leg_nms]
-        ax.legend(leg_nms, labs, loc="center right")
+        ax.legend(leg_nms, labs, loc="center right")  # type: ignore
 
         ax.set_xlabel(f"Network Required {water.capitalize()} Water, BWPD")
         ax.set_ylabel(f"Network Marginal Oil {water.capitalize()} Water Ratio, bbl oil / bbl water")
