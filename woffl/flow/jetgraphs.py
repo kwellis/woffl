@@ -56,10 +56,10 @@ def choked_figures(
         tsu=tsu, ken=jpump_well.ken, ate=jpump_well.ate, ipr_su=ipr_well, prop_su=prop_well
     )
 
-    # need to update this
+    # assumes no pressure drop in annulus, which is fine for this function
     pni = ppf_surf + sp.diff_press_static(rho_pf, wellprof.jetpump_vd)
 
-    pte, ptm, pdi, qoil_std, fwat_bwpd, qnz_bwpd, mach_te, prop_tm = jf.jetpump_overall(
+    pte, ptm, pdi, qoil_std, fwat_bwpd, qnz_bwpd, mach_te, prop_tm = jf.jetpump_base_calcs(
         psu_min,
         tsu,
         pni,
@@ -137,7 +137,7 @@ def pump_pressure_relation(
     pni = ppf_surf + sp.diff_press_static(rho_pf, wellprof.jetpump_vd)  # static
 
     for psu in psu_list:
-        pte, ptm, pdi, qoil_std, fwat_bwpd, qnz_bwpd, mach_te, prop_tm = jf.jetpump_overall(
+        pte, ptm, pdi, qoil_std, fwat_bwpd, qnz_bwpd, mach_te, prop_tm = jf.jetpump_base_calcs(
             psu,
             tsu,
             pni,
@@ -182,7 +182,7 @@ def discharge_check(
     rho_pf: float,
     ppf_surf: float,
     jpump_well: JetPump,
-    tube: Pipe,
+    wellbore: PipeInPipe,
     wellprof: WellProfile,
     ipr_well: InFlow,
     prop_well: ResMix,

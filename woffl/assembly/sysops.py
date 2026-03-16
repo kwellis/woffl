@@ -92,7 +92,8 @@ def discharge_residual(
     """Discharge Residual
 
     Solve for the jet pump discharge residual, which is the difference between discharge pressure
-    calculated by the jetpump and the discharge pressure from the outflow.
+    calculated by the jetpump and the discharge pressure from the outflow. Also iterates on the
+    power fluid rate to account for pressure drop as the power fluid goes to the jet pump.
 
     Args:
         psu (float): Pressure Suction, psig
