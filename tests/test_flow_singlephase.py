@@ -748,10 +748,7 @@ class TestPipeInPipeAnnularPressureDrop:
         expected_re = rho * expected_vel * (1.5 / 12) / (visc / 1488.2)
         expected_rr = abs_ruff / 1.5
         expected_ff = sp.serghide(expected_re, expected_rr)
-        expected_dp = (
-            expected_ff * rho * expected_vel**2 * length
-            / (2 * (1.5 / 12) * 32.174 * 144)
-        )
+        expected_dp = expected_ff * rho * expected_vel**2 * length / (2 * (1.5 / 12) * 32.174 * 144)
 
         assert dp_code == pytest.approx(expected_dp, rel=1e-4)
 
@@ -770,18 +767,14 @@ class TestPipeInPipeAnnularPressureDrop:
         re_tight = sp.reynolds(rho, vel_tight, wb_4half_by_7.ann_hyd_dia, visc)
         rr_tight = sp.relative_roughness(wb_4half_by_7.ann_hyd_dia, wb_4half_by_7.ann_abs_ruff)
         ff_tight = sp.ffactor_darcy(re_tight, rr_tight)
-        dp_tight = sp.diff_press_friction(
-            ff_tight, rho, vel_tight, wb_4half_by_7.ann_hyd_dia, length
-        )
+        dp_tight = sp.diff_press_friction(ff_tight, rho, vel_tight, wb_4half_by_7.ann_hyd_dia, length)
 
         # 3.5 by 7 annulus (wide, Dhyd=2.5")
         vel_wide = sp.velocity(q_ft3s, wb_3half_by_7.ann_area)
         re_wide = sp.reynolds(rho, vel_wide, wb_3half_by_7.ann_hyd_dia, visc)
         rr_wide = sp.relative_roughness(wb_3half_by_7.ann_hyd_dia, wb_3half_by_7.ann_abs_ruff)
         ff_wide = sp.ffactor_darcy(re_wide, rr_wide)
-        dp_wide = sp.diff_press_friction(
-            ff_wide, rho, vel_wide, wb_3half_by_7.ann_hyd_dia, length
-        )
+        dp_wide = sp.diff_press_friction(ff_wide, rho, vel_wide, wb_3half_by_7.ann_hyd_dia, length)
 
         # Tighter annulus = higher friction loss
         assert dp_tight > dp_wide
@@ -819,18 +812,14 @@ class TestPipeInPipeAnnularPressureDrop:
         re_t = sp.reynolds(rho, vel_t, wb_4half_by_7.tube_hyd_dia, visc)
         rr_t = sp.relative_roughness(wb_4half_by_7.tube_hyd_dia, wb_4half_by_7.tube_abs_ruff)
         ff_t = sp.ffactor_darcy(re_t, rr_t)
-        dp_tube = sp.diff_press_friction(
-            ff_t, rho, vel_t, wb_4half_by_7.tube_hyd_dia, length
-        )
+        dp_tube = sp.diff_press_friction(ff_t, rho, vel_t, wb_4half_by_7.tube_hyd_dia, length)
 
         # Annulus dp
         vel_a = sp.velocity(q_ft3s, wb_4half_by_7.ann_area)
         re_a = sp.reynolds(rho, vel_a, wb_4half_by_7.ann_hyd_dia, visc)
         rr_a = sp.relative_roughness(wb_4half_by_7.ann_hyd_dia, wb_4half_by_7.ann_abs_ruff)
         ff_a = sp.ffactor_darcy(re_a, rr_a)
-        dp_ann = sp.diff_press_friction(
-            ff_a, rho, vel_a, wb_4half_by_7.ann_hyd_dia, length
-        )
+        dp_ann = sp.diff_press_friction(ff_a, rho, vel_a, wb_4half_by_7.ann_hyd_dia, length)
 
         # Annular dp should be higher due to smaller hydraulic diameter
         assert dp_ann > dp_tube

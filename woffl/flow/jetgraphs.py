@@ -25,7 +25,7 @@ def choked_figures(
     rho_pf: float,
     ppf_surf: float,
     jpump_well: JetPump,
-    wellbore: Pipe,
+    tubing: Pipe,
     wellprof: WellProfile,
     ipr_well: InFlow,
     prop_well: ResMix,
@@ -42,7 +42,7 @@ def choked_figures(
         rho_pf (float): Power Fluid Density, lbm/ft3
         ppf_surf (float): Pressure of Power Fluid at surface, psig
         jpump_well (JetPump): Jet Pump Class
-        wellbore (Pipe): Pipe Class, used for diffuser diameter
+        tubing (Pipe): Diffuser diameter is assumed to be same size as tubing inner diameter
         wellprof (WellProfile): WellProfile Class, for jet pump TVD
         ipr_well (InFlow): IPR Class
         prop_well (ResMix): Reservoir conditions of the well
@@ -56,6 +56,7 @@ def choked_figures(
         tsu=tsu, ken=jpump_well.ken, ate=jpump_well.ate, ipr_su=ipr_well, prop_su=prop_well
     )
 
+    # need to update this
     pni = ppf_surf + sp.diff_press_static(rho_pf, wellprof.jetpump_vd)
 
     pte, ptm, pdi, qoil_std, fwat_bwpd, qnz_bwpd, mach_te, prop_tm = jf.jetpump_overall(
@@ -69,13 +70,13 @@ def choked_figures(
         jpump_well.kdi,
         jpump_well.ath,
         jpump_well.anz,
-        wellbore.inn_area,
+        tubing.inn_area,
         ipr_well,
         prop_well,
     )
 
     qoil_std, te_book = jplt.throat_entry_book(psu_min, tsu, jpump_well.ken, jpump_well.ate, ipr_well, prop_well)
-    vtm, di_book = jplt.diffuser_book(ptm, tsu, jpump_well.ath, jpump_well.kdi, wellbore.inn_area, qoil_std, prop_tm)
+    vtm, di_book = jplt.diffuser_book(ptm, tsu, jpump_well.ath, jpump_well.kdi, tubing.inn_area, qoil_std, prop_tm)
 
     if folder_path is not None:
         entry_name = "entry_four_" + rev_id + ".png"
@@ -132,6 +133,7 @@ def pump_pressure_relation(
     pdi_list = []
     qoil_list = []
 
+    # need to update this
     pni = ppf_surf + sp.diff_press_static(rho_pf, wellprof.jetpump_vd)  # static
 
     for psu in psu_list:
@@ -210,6 +212,8 @@ def discharge_check(
         tsu=form_temp, ken=jpump_well.ken, ate=jpump_well.ate, ipr_su=ipr_well, prop_su=prop_well
     )
     pte, vte, rho_te, mach_te = te_book.dete_zero()
+
+    # need to update this
     pni = ppf_surf + sp.diff_press_static(rho_pf, wellprof.jetpump_vd)
     vnz = jf.nozzle_velocity(pni, pte, jpump_well.knz, rho_pf)
 

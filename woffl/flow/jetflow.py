@@ -511,12 +511,11 @@ def throat_discharge_old(
     rho_te: float,
     prop_tm: ResMix,
 ):
-    """Throat Discharge Pressure
+    """Throat Discharge Pressure Old
 
-    Solves the throat mixture equation of the jet pump. Calculates throat differntial pressure.
-    Use the throat entry pressure and differential pressure to calculate throat mix pressure.
-    Account for the discharge pressure is greater than the inlet pressure. Loops through the
-    calculated discharge pressure until a converged answer occurs.
+    This is the old way of trying to get the throat mixture to converge.
+    As you can see, the secant method was not used and no guardrails were
+    in place to keep mixture pressure above 15 psig.
 
     Args:
         pte (float): Pressure of Throat Entry, psig
@@ -657,7 +656,7 @@ def diffuser_discharge(
     return vtm, pdi  # type: ignore
 
 
-def jetpump_overall(
+def jetpump_base_calcs(
     psu: float,
     tsu: float,
     pni: float,
@@ -675,7 +674,11 @@ def jetpump_overall(
     """Jet Pump Overall Equations
 
     Solve the jetpump equations, calculating out the expected discharge conditions.
-    Function dete_zero() will raise a ValueError if the selected psu is too low.
+    Function dete_zero() will raise a ValueError if the selected psu is too low. This method is
+    being depreciated because it assumes a fixed powerfluid pressure directly at the jet pump. In
+    practice this is difficult. Part of the code is being moved into "sysops" file under the
+    discharge residual code so a power fluid rate iteration can be added. Additionally, discharge
+    residual will allow for defining if the jetpump is forward or reverse circulating.
 
     Args:
         psu (float): Suction Pressure, psig
@@ -707,8 +710,8 @@ def jetpump_overall(
     pte, vte, rho_te, mach_te = te_book.dete_zero()
 
     vnz = nozzle_velocity(pni, pte, knz, rho_ni)
-
     qnz_ft3s, qnz_bwpd = nozzle_rate(vnz, anz)
+
     wc_tm, fwat_bwpd = throat_wc(qoil_std, prop_su.wc, qnz_bwpd)
 
     prop_tm = ResMix(wc_tm, prop_su.fgor, prop_su.oil, prop_su.wat, prop_su.gas)

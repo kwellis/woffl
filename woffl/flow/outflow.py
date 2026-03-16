@@ -253,18 +253,18 @@ def production_bottom_up_press(
     return md_seg, prs_ray, slh_ray
 
 
-def powerfluid_top_down_press(
+def powerfluid_top_down_friction(
     ptop: float,
     ttop: float,
     qwat_bpd: float,
-    prop: FormWater,  # update later to accept deadoil? need to integrate with resmix
+    prop_pf: FormWater,  # update later to accept deadoil? need to integrate with resmix
     wellbore: PipeInPipe,
     wellprof: WellProfile,
     flowpath: str = "annulus",
-) -> tuple[float, float]:
-    """Power Fluid Top Down Pressure Calculation
+) -> float:
+    """Power Fluid Top Down Friction Calculation
 
-    Used for calculating pressure drop in the annlus (reverse circulating) or
+    Used for calculating frictional pressure drop in the annlus (reverse circulating) or
     in the tubing (forward circulating) depennding on flow path. Prop is the
     power fluid properties, which is FormWater class, but really is just water.
 
@@ -275,10 +275,9 @@ def powerfluid_top_down_press(
         prop (FormWater): Poperties of Power Fluid
         wellbore (PipeInPipe): Piping geometry inside the wellbore, PipeInPipe
         wellprof (WellProfile): survey dimensions and location of jet pump, WellProfile
-        flowpath (str): Where the flow is occuring, either tubing or annulus
+        flowpath (str): Where the flow is occuring, either "tubing" or "annulus"
 
     Returns:
-        dp_stat (float): Static Differential Pressure, psid
         dp_fric (float): Friction Differntial Pressure, psid
     """
     flow_path_list = ["tubing", "annulus"]
@@ -295,15 +294,13 @@ def powerfluid_top_down_press(
 
     # height, positive is up?
     length = wellprof.jetpump_md  # distance down wellbore to jet pump
-    height = wellprof.jetpump_vd  # depth down wellbore to jet pump
 
-    prop = prop.condition(ptop, ttop)
+    prop_pf = prop_pf.condition(ptop, ttop)
     qwat_fts = sp.bpd_to_ft3s(qwat_bpd)
     vel = sp.velocity(qwat_fts, area)
-    NRe = sp.reynolds(prop.density, vel, hyd_dia, prop.viscosity())  # need to refactor properties
+    NRe = sp.reynolds(prop_pf.density, vel, hyd_dia, prop_pf.viscosity())  # need to refactor properties
     rel_ruff = sp.relative_roughness(hyd_dia, abs_ruff)
     ff = sp.ffactor_darcy(NRe, rel_ruff)
 
-    dp_fric = sp.diff_press_friction(ff, prop.density, vel, hyd_dia, length)
-    dp_stat = sp.diff_press_static(prop.density, -1 * height)  # power fluid goes down
-    return dp_stat, dp_fric
+    dp_fric = sp.diff_press_friction(ff, prop_pf.density, vel, hyd_dia, length)
+    return dp_fric

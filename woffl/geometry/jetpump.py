@@ -103,13 +103,13 @@ class JetPump:
         try:
             dth = JetPump.throat_dia[throat_idx]
         except IndexError:
-            print(f"Nozzle Throat Combo {str(nozzle_no)+str(area_ratio)} not recognized")
+            print(f"Nozzle Throat Combo {str(nozzle_no) + str(area_ratio)} not recognized")
 
         self.dnz = dnz
         self.dth = dth
 
     def __repr__(self):
-        return f"{self.noz_no+self.rat_ar} Jet Pump, Nozzle: {self.dnz} inches, Throat: {self.dth} inches"
+        return f"{self.noz_no + self.rat_ar} Jet Pump, Nozzle: {self.dnz} inches, Throat: {self.dth} inches"
 
     @staticmethod
     def area_circle(diameter):
