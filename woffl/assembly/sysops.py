@@ -132,8 +132,9 @@ def discharge_residual(
     )
     pte, vte, rho_te, mach_te = te_book.dete_zero()
 
+    # iterate on powerfluid flowrate to account for annular differential pressure
     dp_stat = sp.diff_press_static(prop_pf.density, -1 * wellprof.jetpump_vd)  # static power fluid pressure
-    qpf_list = [1000.0, 2000.0]  # bwpd, power fluid flowrate guess at 1 and 2
+    qpf_list = [2000.0, 3000.0]  # bwpd, power fluid flowrate guess at 1 and 2
     res_list = []  # power fluid residual list
 
     for qpf in qpf_list:
@@ -149,6 +150,9 @@ def discharge_residual(
         )
         qpf_list.append(qpf)
         res_list.append(qpf_res)
+
+    # print(f"Iterated PowerFluid and Residual {dict(zip(qpf_list, res_list))}")
+    # print(f"Frictional Loss: {pni + dp_stat - ppf_surf:.1f} psi")
 
     # should I do something with pni???
     qnz_bwpd = qpf_list[-1]
