@@ -97,7 +97,7 @@ def pump_pressure_relation(
     rho_pf: float,
     ppf_surf: float,
     jpump_well: JetPump,
-    wellbore: Pipe,
+    tubing: Pipe,
     wellprof: WellProfile,
     ipr_well: InFlow,
     prop_well: ResMix,
@@ -114,7 +114,7 @@ def pump_pressure_relation(
         rho_pf (float): Power Fluid Density, lbm/ft3
         ppf_surf (float): Pressure of Power Fluid at surface, psig
         jpump_well (JetPump): Jet Pump Class
-        wellbore (Pipe): Pipe Class, used for diffuser diameter
+        tubing (Pipe): Pipe Class, used for diffuser diameter
         wellprof (WellProfile): WellProfile Class, for jet pump TVD
         ipr_well (InFlow): IPR Class
         prop_well (ResMix): Reservoir conditions of the well
@@ -148,7 +148,7 @@ def pump_pressure_relation(
             jpump_well.kdi,
             jpump_well.ath,
             jpump_well.anz,
-            wellbore.inn_area,
+            tubing.inn_area,
             ipr_well,
             prop_well,
         )
@@ -224,9 +224,11 @@ def discharge_check(
     ptm = jf.throat_discharge(
         pte, form_temp, jpump_well.kth, vnz, jpump_well.anz, rho_pf, vte, jpump_well.ate, rho_te, prop_tm
     )
-    vtm, pdi = jf.diffuser_discharge(ptm, form_temp, jpump_well.kdi, jpump_well.ath, tube.inn_area, qoil_std, prop_tm)
+    vtm, pdi = jf.diffuser_discharge(
+        ptm, form_temp, jpump_well.kdi, jpump_well.ath, wellbore.inn_pipe.inn_area, qoil_std, prop_tm
+    )
 
-    md_seg, prs_ray, slh_ray = of.production_top_down_press(surf_pres, form_temp, qoil_std, prop_tm, tube, wellprof)
+    md_seg, prs_ray, slh_ray = of.production_top_down_press(surf_pres, form_temp, qoil_std, prop_tm, wellbore, wellprof)
 
     outflow_pdi = prs_ray[-1]
     diff_pdi = pdi - outflow_pdi
@@ -254,7 +256,9 @@ def discharge_check(
     qsu_std, te_book = jplt.throat_entry_book(psu_min, form_temp, jpump_well.ken, jpump_well.ate, ipr_well, prop_well)
     te_book.plot_te()
     # print(te_book)
-    vtm, di_book = jplt.diffuser_book(ptm, form_temp, jpump_well.ath, jpump_well.kdi, tube.inn_area, qsu_std, prop_tm)
+    vtm, di_book = jplt.diffuser_book(
+        ptm, form_temp, jpump_well.ath, jpump_well.kdi, wellbore.inn_pipe.inn_area, qsu_std, prop_tm
+    )
     di_book.plot_di()
     # print(di_book)
     # te_book.plot()

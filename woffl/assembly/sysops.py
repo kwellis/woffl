@@ -172,30 +172,32 @@ def discharge_residual(
 def jetpump_solver(
     pwh: float,
     tsu: float,
-    rho_pf: float,  # remove this, will just use reservoir mixture water instead
     ppf_surf: float,
     jpump: JetPump,
-    wellbore: Pipe,  # modify this to be annulus instead of wellbore
+    wellbore: PipeInPipe,
     wellprof: WellProfile,
     ipr_su: InFlow,
     prop_su: ResMix,
+    prop_pf: FormWater,
+    jpump_direction: str = "reverse",
 ) -> tuple[float, bool, float, float, float, float]:
     """JetPump Solver
 
-    Find a solution for the jetpump system that factors in the wellhead pressure and reservoir conditions.
-    The solver will move along the psu and dEte curves until a solution is found that satisfies the outflow
-    tubing and pump conditions.
+    Find a solution for the jetpump system. Takes into account the reservoir conditions, the wellhead
+    pressure, tubing and annulus geometry. The solver will move along the psu and dEte curves until a
+    solution is found that satisfies the outflow tubing, annulus and pump conditions.
 
     Args:
         pwh (float): Pressure Wellhead, psig
         tsu (float): Temperature Suction, deg F
-        rho_pf (float): Density of the power fluid, lbm/ft3
         ppf_surf (float): Pressure Power Fluid Surface, psig
         jpump (JetPump): Jet Pump Class
-        wellbore (Pipe): Pipe Class of the Wellbore
+        wellbore (PipeInPipe): Wellbore Geometry of Tubing and Casing
         wellprof (WellProfile): Well Profile Class
         ipr_su (InFlow): Inflow Performance Class
         prop_su (ResMix): Reservoir Mixture Conditions
+        prop_pf (FormWater): Power Fluid Properties, assumed to be the same as formation water
+        jpump_direction (str): Jet Pump Direction, "forward" or "reverse" Circulating
 
     Returns:
         psu (float): Suction Pressure, psig
@@ -207,7 +209,7 @@ def jetpump_solver(
     """
     psu_min, qoil_std, te_book = jf.psu_minimize(tsu=tsu, ken=jpump.ken, ate=jpump.ate, ipr_su=ipr_su, prop_su=prop_su)
     res_min, qoil_std, fwat_bwpd, qnz_bwpd, mach_te = discharge_residual(
-        psu_min, pwh, tsu, rho_pf, ppf_surf, jpump, wellbore, wellprof, ipr_su, prop_su
+        psu_min, pwh, tsu, ppf_surf, jpump, wellbore, wellprof, ipr_su, prop_su, prop_pf, jpump_direction
     )
 
     # if the jetpump (available) discharge is above the outflow (required) discharge at lowest suction
@@ -217,7 +219,9 @@ def jetpump_solver(
         return psu_min, sonic_status, qoil_std, fwat_bwpd, qnz_bwpd, mach_te
 
     psu_max = ipr_su.pres - 10  # max suction pressure that can be used
-    res_max, *etc = discharge_residual(psu_max, pwh, tsu, rho_pf, ppf_surf, jpump, wellbore, wellprof, ipr_su, prop_su)
+    res_max, *etc = discharge_residual(
+        psu_max, pwh, tsu, ppf_surf, jpump, wellbore, wellprof, ipr_su, prop_su, prop_pf, jpump_direction
+    )
 
     # if the jetpump (available) discharge is below the outflow (required) discharge at highest suction
     # the well will not flow, need to pick different parameters
@@ -237,7 +241,7 @@ def jetpump_solver(
     while abs(psu_list[-2] - psu_list[-1]) > psu_diff:
         psu_nxt = jf.psu_secant(psu_list[0], psu_list[1], res_list[0], res_list[1])
         res_nxt, qoil_std, fwat_bwpd, qnz_bwpd, mach_te = discharge_residual(
-            psu_nxt, pwh, tsu, rho_pf, ppf_surf, jpump, wellbore, wellprof, ipr_su, prop_su
+            psu_nxt, pwh, tsu, ppf_surf, jpump, wellbore, wellprof, ipr_su, prop_su, prop_pf, jpump_direction
         )
         psu_list.append(psu_nxt)
         res_list.append(res_nxt)
