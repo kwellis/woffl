@@ -57,17 +57,20 @@ def constraint_spaces(well_dict: dict, Qp_tot: float) -> tuple[np.ndarray, np.nd
     """
     # constraints for each well to be non-negative
     n = len(well_dict)  # number of wells
-    A = np.eye(n)  # identity matrix
-    b = []
+    A_min = np.eye(n)  # identity matrix to handle min powerfluid constraints
+    b_min = []
+    A_max = -1 * A_min.copy()
+    b_max = []
     for well_name, well_params in well_dict.items():
-        b.append(well_params["qp_min"])  # store the minimum water for each well
+        b_min.append(well_params["qpf_min"])  # store the minimum water for each well
+        b_max.append(-1 * well_params["qpf_max"])  # store the maximum water for each well
 
     # negative because sign is flipped, not sure why it needs to be unit vector?
     ai_tot = np.full(n, -1)
     bi_tot = -Qp_tot
 
-    A = np.vstack((A, ai_tot))
-    b.append(bi_tot)
+    A = np.vstack((A_min, ai_tot, A_max))
+    b = [*b_min, bi_tot, *b_max]
 
     return A, np.array(b)
 

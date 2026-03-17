@@ -54,6 +54,8 @@ class BatchPump:
         prop_pf: FormWater,
         jpump_direction: str = "reverse",
         wellname: str = "na",
+        qpf_min: float = 0,
+        qpf_max: float = 6000,
     ) -> None:
         """Batch Pump Solver
 
@@ -71,6 +73,8 @@ class BatchPump:
             prop_pf (FormWater): Powerfluid Properties
             jpump_direction (str): Jet Pump Direction, "reverse" or "forward"
             wellname (str): A unique identifier of the wellname
+            qpf_min (float): Min allowable powerfluid in optimization, bwpd
+            qpf_max (float): Max allowable powerfluid in optimization, bwpd
         """
         self.pwh = pwh
         self.tsu = tsu
@@ -82,6 +86,8 @@ class BatchPump:
         self.prop_pf = prop_pf
         self.direction = jpump_direction
         self.wellname = wellname
+        self.qpf_min = qpf_min
+        self.qpf_max = qpf_max
 
     def update_press(self, kind: str, psig: float) -> None:
         """Update Pressure
