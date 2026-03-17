@@ -20,13 +20,14 @@ def well_second_derv(qp: float, c2: float, c3: float):
     return c2 * c3**2 * np.exp(-qp * c3)
 
 
-def guess_Qp(well_dict: dict, Qp_tot: float) -> np.ndarray:
-    """Guess Power Fluid Flow Vector
+def initial_powerfluid_alloc(well_dict: dict, Qp_tot: float) -> np.ndarray:
+    """Initial Power Fluid Allocation
 
     Create a feasible vector of power fluid flowrates that can
     be assigned to each well and used to kick off the optimization
-    scheme. Each well is assigned the same power fluid volume to
-    start the calculation.
+    scheme. The scheme will look at the total surface pump capacity available
+    and the maximum powerfluid allowable for each well. It will decide which
+    constraints are more binding initially and create a feasible starting point.
 
     Args:
         well_dict (dict): Well Dictionary of Definied Parameters
@@ -34,6 +35,22 @@ def guess_Qp(well_dict: dict, Qp_tot: float) -> np.ndarray:
 
     Return:
         Qp (np.array): Array of gradients for each well"""
+
+    Qpf_max = []
+    for well_name, well_params in well_dict.items():
+        Qpf_max.append(well_params["qpf_max"])
+    Qpf_max_tot = sum(Qpf_max)  # individual max contraints added up together
+    Qpf_max = np.asarray(Qpf_max)
+
+    if Qpf_max_tot <= Qp_tot:  # if the individual max power fluid constraints are less than  surface pump capacity
+        Qp = Qpf_max
+    else:  # use the surface pump capacity as the feasible active constraints
+        num_wells = len(well_dict)
+        Qp = np.full(num_wells, Qp_tot / num_wells)
+
+        residual = Qpf_max - Qp  # make sure none of the evenly split values exceed an individual value
+        while np.any(residual) < 0:
+            neg_res = residual[residual >= 0] = 0  # return values where even split exceeds individual maximum
 
     num_wells = len(well_dict)
     Qp = np.full(num_wells, Qp_tot / num_wells)
