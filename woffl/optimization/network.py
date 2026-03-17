@@ -8,6 +8,8 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import ratiotest as rt
+import rednewton as rn
 
 import woffl.assembly.curvefit as cf
 from woffl.assembly.batchrun import BatchPump, validate_water
@@ -106,3 +108,56 @@ class WellNetwork:
             well.batch_run(jetpumps, debug)
             well.process_results()
         self.results = True  # tracker to know if results have been ran
+
+
+def optimize_power_fluid(well_dict: dict, Qp_tot: float) -> tuple[float, np.ndarray, np.ndarray, int]:
+    """Optimize Power Fluid
+
+    Args:
+        well_dict (dict): Well Dictionary of Definied Parameters
+        Qp_tot (float): Total Available Power Fluid to Split out
+
+    Return:
+        Qo (float): Maximized Oil Rate for the wells
+        Qp (np.array): Array of gradients for each well
+        dfk (np.array): Gradient at each well
+        k (int): Number of Iterations
+    """
+
+    Qp = rn.guess_Qp(well_dict, Qp_tot)  # split up power fluid
+    A, b = rn.constraint_spaces(well_dict, Qp_tot)
+    active = rn.constraint_active(A, b, Qp)  # active constraints
+    Z, Ar = rn.qr_split(A[active])
+    dfk = rn.update_gradient(well_dict, Qp)
+
+    optm_check, active, con_update = rn.optimality_test(dfk, Z, Ar, active)
+    if con_update:  # active constraint was removed
+        Z, Ar = rn.qr_split(A[active])  # update Z and Ar
+
+    k = 0
+    while optm_check is False:
+
+        dfk = rn.update_gradient(well_dict, Qp)
+        Hfk = rn.update_hessian(well_dict, Qp)
+
+        optm_check, active, con_update = rn.optimality_test(dfk, Z, Ar, active)
+        if con_update:  # active constraint was removed
+            Z, Ar = rn.qr_split(A[active])  # update Z and Ar
+
+        p = rn.newton_reduced(dfk, Hfk, Z)
+
+        alpha = rn.line_search_backtrack(rn.update_objective, well_dict, Qp, dfk, p)
+        tau, idx = rt.ratio_test(Qp, p, A[~active], b[~active], np.where(~active)[0])  # distance to constraints
+
+        if tau <= alpha:
+            alpha = tau
+            active[idx] = True  # active constraint added
+            Z, Ar = rn.qr_split(A[active])  # update Z and Ar
+
+        Qp = Qp + alpha * p
+
+        if k == 100:
+            break
+        k = k + 1
+
+    return rn.update_objective(well_dict, Qp), Qp, dfk, k
