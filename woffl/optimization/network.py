@@ -104,17 +104,29 @@ class WellNetwork:
             jetpumps (list): List of JetPumps
             debug (bool): True - Errors are Raised, False - Errors are Stored
         """
+        network_dict = {}  # store stuff to be passed into optimization algorithm
         for well in self.well_list:
             well.batch_run(jetpumps, debug)
             well.process_results()
+
+            c1, c2, c3 = well.coeff_lift
+            network_dict.update(
+                {well.wellname: {"c1": c1, "c2": c2, "c3": c3, "qpf_min": well.qpf_min, "qpf_max": well.qpf_max}}
+            )
+
         self.results = True  # tracker to know if results have been ran
+        self.network_dict = network_dict
 
 
-def optimize_power_fluid(well_dict: dict, Qp_tot: float) -> tuple[float, np.ndarray, np.ndarray, int]:
+def optimize_power_fluid(network_dict: dict, Qp_tot: float) -> tuple[float, np.ndarray, np.ndarray, int]:
     """Optimize Power Fluid
 
+    Run a continuous reduced Newton optimization algorithm that allows each well to
+    be assigned an optimal power fluid rate. This power fluid rate is used to choose which
+    discrete jet pump most closely matches that power fluid rate from the semi-finalists.
+
     Args:
-        well_dict (dict): Well Dictionary of Definied Parameters
+        network_dict (dict): Dictionary with Well Parameters on the Network
         Qp_tot (float): Total Available Power Fluid to Split out
 
     Return:
@@ -124,11 +136,11 @@ def optimize_power_fluid(well_dict: dict, Qp_tot: float) -> tuple[float, np.ndar
         k (int): Number of Iterations
     """
 
-    Qp = rn.initial_powerfluid_alloc(well_dict, Qp_tot)  # split up power fluid
-    A, b = rn.constraint_spaces(well_dict, Qp_tot)
+    Qp = rn.initial_powerfluid_alloc(network_dict, Qp_tot)  # split up power fluid
+    A, b = rn.constraint_spaces(network_dict, Qp_tot)
     active = rn.constraint_active(A, b, Qp)  # active constraints
     Z, Ar = rn.qr_split(A[active])
-    dfk = rn.update_gradient(well_dict, Qp)
+    dfk = rn.update_gradient(network_dict, Qp)
 
     optm_check, active, con_update = rn.optimality_test(dfk, Z, Ar, active)
     if con_update:  # active constraint was removed
@@ -137,8 +149,8 @@ def optimize_power_fluid(well_dict: dict, Qp_tot: float) -> tuple[float, np.ndar
     k = 0
     while optm_check is False:
 
-        dfk = rn.update_gradient(well_dict, Qp)
-        Hfk = rn.update_hessian(well_dict, Qp)
+        dfk = rn.update_gradient(network_dict, Qp)
+        Hfk = rn.update_hessian(network_dict, Qp)
 
         optm_check, active, con_update = rn.optimality_test(dfk, Z, Ar, active)
         if con_update:  # active constraint was removed
@@ -146,7 +158,7 @@ def optimize_power_fluid(well_dict: dict, Qp_tot: float) -> tuple[float, np.ndar
 
         p = rn.newton_reduced(dfk, Hfk, Z)
 
-        alpha = rn.line_search_backtrack(rn.update_objective, well_dict, Qp, dfk, p)
+        alpha = rn.line_search_backtrack(rn.update_objective, network_dict, Qp, dfk, p)
         tau, idx = rt.ratio_test(Qp, p, A[~active], b[~active], np.where(~active)[0])  # distance to constraints
 
         if tau <= alpha:
@@ -160,4 +172,25 @@ def optimize_power_fluid(well_dict: dict, Qp_tot: float) -> tuple[float, np.ndar
             break
         k = k + 1
 
-    return rn.update_objective(well_dict, Qp), Qp, dfk, k
+    return rn.update_objective(network_dict, Qp), Qp, dfk, k
+
+
+def optimize_jet_pumps(well_list: list[BatchPump], Qp_optm: np.ndarray, Qp_tot: float) -> None:
+    """Optimize Jet Pumps
+
+    Run a discrete jet pump selection. Take the optimized power fluid rates from the continuous
+    algorithm and use those as a starting point to pick the actual jet pumps. Each jet pump will
+    have two different options that straddle the optimized power fluid rate, a high and low case.
+    It is up to this algorithm to choose what is the best total outcome. It still needs to adhere
+    to the total power fluid constraint, but the minimum and max individual constraints are no
+    longer required.
+
+    Args:
+        well_list (list): List of the BatchPump Results
+        Qp_optm (np.array): Array of the optimal power fluid rates to maximize oil
+        Qp_tot (float): The total available surface pump capacity, bwpd
+
+    Returns:
+        no_idea (rawr): Need to figure this part out...
+    """
+    return None
