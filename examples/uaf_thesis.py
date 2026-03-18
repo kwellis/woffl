@@ -3,15 +3,16 @@ import timeit
 
 import numpy as np
 
+# from woffl.optimization import ratiotest as rt
 from woffl.optimization import network as nw
-from woffl.optimization import ratiotest as rt
-from woffl.optimization import rednewton as rn
+
+# from woffl.optimization import rednewton as rn
 
 # define the wells and define the minimum power fluid flowrate in BPD
 wells = {
     "india_15": {"c1": 353, "c2": 230, "c3": 9.6e-4, "qpf_min": 0, "qpf_max": 8000},
     "india_17": {"c1": 578, "c2": 430, "c3": 5.6e-4, "qpf_min": 0, "qpf_max": 8000},
-    "india_33": {"c1": 1237, "c2": 1226, "c3": 7.35e-4, "qpf_min": 0, "qpf_max": 8000},
+    "india_33": {"c1": 1237, "c2": 1226, "c3": 7.35e-4, "qpf_min": 0, "qpf_max": 4000},
     "india_31": {"c1": 944, "c2": 807, "c3": 6.9e-4, "qpf_min": 0, "qpf_max": 8000},
 }
 

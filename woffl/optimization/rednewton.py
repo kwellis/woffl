@@ -34,26 +34,19 @@ def initial_powerfluid_alloc(well_dict: dict, Qp_tot: float) -> np.ndarray:
         Qp_tot (float): Total Available Power Fluid to Split out
 
     Return:
-        Qp (np.array): Array of gradients for each well"""
+        Qp (np.array): Array of power fluid flow rates for each well"""
 
     Qpf_max = []
     for well_name, well_params in well_dict.items():
         Qpf_max.append(well_params["qpf_max"])
-    Qpf_max_tot = sum(Qpf_max)  # individual max contraints added up together
     Qpf_max = np.asarray(Qpf_max)
 
-    if Qpf_max_tot <= Qp_tot:  # if the individual max power fluid constraints are less than  surface pump capacity
-        Qp = Qpf_max
-    else:  # use the surface pump capacity as the feasible active constraints
-        num_wells = len(well_dict)
-        Qp = np.full(num_wells, Qp_tot / num_wells)
-
-        residual = Qpf_max - Qp  # make sure none of the evenly split values exceed an individual value
-        while np.any(residual) < 0:
-            neg_res = residual[residual >= 0] = 0  # return values where even split exceeds individual maximum
-
+    # evenly split the surface pump capacity amongst the various wells
     num_wells = len(well_dict)
     Qp = np.full(num_wells, Qp_tot / num_wells)
+
+    # keep allocated powerfluid volume below any individual well constraint
+    Qp = np.minimum(Qp, Qpf_max)
     return Qp
 
 

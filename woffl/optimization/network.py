@@ -8,10 +8,10 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import ratiotest as rt
-import rednewton as rn
 
 import woffl.assembly.curvefit as cf
+import woffl.optimization.ratiotest as rt
+import woffl.optimization.rednewton as rn
 from woffl.assembly.batchrun import BatchPump, validate_water
 from woffl.geometry import JetPump
 
@@ -124,7 +124,7 @@ def optimize_power_fluid(well_dict: dict, Qp_tot: float) -> tuple[float, np.ndar
         k (int): Number of Iterations
     """
 
-    Qp = rn.guess_Qp(well_dict, Qp_tot)  # split up power fluid
+    Qp = rn.initial_powerfluid_alloc(well_dict, Qp_tot)  # split up power fluid
     A, b = rn.constraint_spaces(well_dict, Qp_tot)
     active = rn.constraint_active(A, b, Qp)  # active constraints
     Z, Ar = rn.qr_split(A[active])
