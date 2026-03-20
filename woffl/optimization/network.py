@@ -8,6 +8,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from ortools.algorithms.python import knapsack_solver
 
 import woffl.assembly.curvefit as cf
 import woffl.optimization.ratiotest as rt
@@ -175,7 +176,7 @@ def optimize_power_fluid(network_dict: dict, Qp_tot: float) -> tuple[float, np.n
     return rn.update_objective(network_dict, Qp), Qp, dfk, k
 
 
-def optimize_jet_pumps(well_list: list[BatchPump], Qp_optm: np.ndarray, Qp_tot: float) -> None:
+def optimize_jet_pumps(well_list: list[BatchPump], Qp_optm: np.ndarray, Qp_tot: float) -> pd.DataFrame:
     """Optimize Jet Pumps
 
     Run a discrete jet pump selection. Take the optimized power fluid rates from the continuous
@@ -193,4 +194,66 @@ def optimize_jet_pumps(well_list: list[BatchPump], Qp_optm: np.ndarray, Qp_tot: 
     Returns:
         no_idea (rawr): Need to figure this part out...
     """
-    return None
+    discrete_list = []
+
+    for well, qpf_optm in zip(well_list, Qp_optm):
+        df = well.df
+        df["pf_diff"] = df["lift_wat"] - qpf_optm
+
+        df_low = df[(df["semi"]) & (df["pf_diff"] < 0)]
+        df_high = df[(df["semi"]) & (df["pf_diff"] >= 0)]
+
+        if not df_low.empty and not df_high.empty:
+            row_base = df_low.loc[df_low["pf_diff"].idxmax()]
+            row_high = df_high.loc[df_high["pf_diff"].idxmin()]
+            discrete_list.append(
+                {
+                    "wellname": well.wellname,
+                    "qpf_optm": qpf_optm,
+                    "qpf_base": row_base["lift_wat"],
+                    "qpf_high": row_high["lift_wat"],
+                    "qoil_base": row_base["qoil_std"],
+                    "qoil_high": row_high["qoil_std"],
+                    "jp_base": row_base["nozzle"] + row_base["throat"],
+                    "jp_high": row_high["nozzle"] + row_high["throat"],
+                    "qpf_diff": np.ceil(row_high["lift_wat"]) - np.floor(row_base["lift_wat"]),
+                    "qoil_diff": np.ceil(row_high["qoil_std"]) - np.floor(row_base["qoil_std"]),
+                }
+            )
+        else:
+            # only one side exists — use closest semi-finalist as base, no high option
+            row = df_low.loc[df_low["pf_diff"].idxmax()] if df_high.empty else df_high.loc[df_high["pf_diff"].idxmin()]
+            discrete_list.append(
+                {
+                    "wellname": well.wellname,
+                    "qpf_optm": qpf_optm,
+                    "qpf_base": row["lift_wat"],
+                    "qpf_high": np.nan,
+                    "qoil_base": row["qoil_std"],
+                    "qoil_high": np.nan,
+                    "jp_base": row["nozzle"] + row["throat"],
+                    "jp_high": np.nan,
+                    "qpf_diff": 100,  # give it a false elevated weight so the solver won't pick it
+                    "qoil_diff": -100,  # give it a false negative profit so solver doesn't select it
+                }
+            )
+
+    # assume all base jetpumps to begin with. The decision is between keeping the base (0)
+    # and going with a high jet pump (1). Bag space is the difference between the surface
+    # pump available and base jet pump total powerfluid demand. Profit is the incremental oil
+    # from base to high. Weight is the incremental power fluid from base to high.
+    df_kp = pd.DataFrame(discrete_list)
+
+    profit = [int(x) for x in df_kp["qoil_diff"]]
+    weight = [int(x) for x in df_kp["qpf_diff"]]
+    bag_size = int(np.ceil(Qp_tot - df_kp["qpf_base"].sum()))
+
+    solver = knapsack_solver.KnapsackSolver(
+        knapsack_solver.SolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER, "JetPump_Knapsack"
+    )
+
+    solver.init(profit, [weight], [bag_size])
+    solver.solve()
+    df_kp["select_high"] = [solver.best_solution_contains(i) for i in range(len(profit))]
+
+    return df_kp

@@ -23,7 +23,8 @@ dependencies = [
     "matplotlib>=3.8.2",
     "numpy>=1.26.3", 
     "pandas>=2.1.4", # pandas installs numpy, but I might get rid of pandas
-    "scipy>=1.11.4", 
+    "scipy>=1.11.4",
+    "ortools>=9.15" 
 ]
 
 requires-python = ">=3.10" # not sure when type hinting was released
