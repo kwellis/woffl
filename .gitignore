@@ -10,7 +10,7 @@ random_debug.py
 
 # specific folders
 /.claude
-
+CLAUDE.md
 
 # Editors
 .vscode/

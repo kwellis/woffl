@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from scipy.optimize import minimize
 
 import woffl.assembly.curvefit as cf
 import woffl.assembly.sysops as so
@@ -206,6 +207,63 @@ class BatchPump:
             results.append(result)  # add some progress bar code here?
         self.df = pd.DataFrame(results)
         return self.df  # should this be returned as none?
+
+    def search_run(self, seed: JetPump, debug: bool = False) -> pd.DataFrame:
+        """Search Run using Nelder-Mead
+
+        Use Nelder-Mead to find the continuous nozzle and throat diameters that maximize
+        oil rate for the given well conditions. The optimal continuous diameters are then
+        snapped to the nearest catalog jet pump. The final result is the actual performance
+        of that catalog pump, solved through the full wellbore physics.
+
+        Args:
+            seed (JetPump): Starting jet pump to seed the optimizer
+            debug (bool): True - Errors are Raised, False - Errors are Stored
+
+        Returns:
+            df (DataFrame): DataFrame with the catalog pump result and continuous optimum
+        """
+
+        def objective(x):
+            dnz, dth = x
+            if dth <= dnz:
+                return 1e10
+            jp = continuous_jetpump(dnz, dth, seed.knz, seed.ken, seed.kth, seed.kdi)
+            try:
+                _, _, qoil, _, _, _ = so.jetpump_solver(
+                    self.pwh,
+                    self.tsu,
+                    self.ppf_surf,
+                    jp,
+                    self.wellbore,
+                    self.wellprof,
+                    self.ipr_su,
+                    self.prop_su,
+                    self.prop_pf,
+                    self.direction,
+                )
+                return -qoil
+            except Exception:
+                return 1e10
+
+        x0 = [seed.dnz, seed.dth]
+        bounds = [
+            (JetPump.nozzle_dia[0], JetPump.nozzle_dia[-1]),
+            (JetPump.throat_dia[0], JetPump.throat_dia[-1]),
+        ]
+
+        result = minimize(objective, x0, method="Nelder-Mead", bounds=bounds)
+        dnz_opt, dth_opt = result.x
+
+        # snap to the nearest catalog jet pump and run the actual physics
+        best_jp = snap_to_catalog(dnz_opt, dth_opt, seed.knz, seed.ken, seed.kth, seed.kdi)
+        df = self.batch_run([best_jp], debug)
+
+        # store the continuous optimum for reference
+        df["dnz_opt"] = dnz_opt
+        df["dth_opt"] = dth_opt
+
+        return df
 
     def process_results(self) -> pd.DataFrame:
         """Process Results
@@ -594,3 +652,85 @@ def batch_plot_derv_base(
     ax.plot(fit_water, fit_grad, color=mcolor, linestyle="--", label=label2)
 
     return None
+
+
+def continuous_jetpump(
+    dnz: float,
+    dth: float,
+    knz: float = 0.01,
+    ken: float = 0.03,
+    kth: float = 0.3,
+    kdi: float = 0.3,
+) -> JetPump:
+    """Create a Jet Pump with Arbitrary Continuous Diameters
+
+    Bypass the catalog lookup in JetPump.__init__ and set nozzle and throat
+    diameters directly. Used by the Nelder-Mead optimizer to evaluate
+    non-catalog pump geometries during the search.
+
+    Args:
+        dnz (float): Nozzle Diameter, inches
+        dth (float): Throat Diameter, inches
+        knz (float): Nozzle Friction Factor, unitless
+        ken (float): Enterance Friction Factor, unitless
+        kth (float): Throat Friction Factor, unitless
+        kdi (float): Diffuser Friction Factor, unitless
+
+    Returns:
+        jp (JetPump): Jet Pump with the specified diameters
+    """
+    jp = object.__new__(JetPump)
+    jp.noz_no = "opt"
+    jp.rat_ar = "opt"
+    jp.knz = knz
+    jp.ken = ken
+    jp.kth = kth
+    jp.kdi = kdi
+    jp.dnz = dnz
+    jp.dth = dth
+    return jp
+
+
+def snap_to_catalog(
+    dnz_opt: float,
+    dth_opt: float,
+    knz: float = 0.01,
+    ken: float = 0.03,
+    kth: float = 0.3,
+    kdi: float = 0.3,
+) -> JetPump:
+    """Snap Continuous Diameters to Nearest Catalog Jet Pump
+
+    Find the valid nozzle and area ratio combination whose diameters are
+    closest (Euclidean distance) to the continuous optimum. Searches all
+    valid nozzle/area_ratio pairs in the Champion X catalog.
+
+    Args:
+        dnz_opt (float): Optimal Nozzle Diameter, inches
+        dth_opt (float): Optimal Throat Diameter, inches
+        knz (float): Nozzle Friction Factor, unitless
+        ken (float): Enterance Friction Factor, unitless
+        kth (float): Throat Friction Factor, unitless
+        kdi (float): Diffuser Friction Factor, unitless
+
+    Returns:
+        jp (JetPump): Nearest valid catalog Jet Pump
+    """
+    best_dist = np.inf
+    best_nozzle = None
+    best_ratio = None
+
+    for noz_idx, dnz_cat in enumerate(JetPump.nozzle_dia):
+        nozzle_no = str(noz_idx + 1)
+        for letter, offset in JetPump.area_code.items():
+            thr_idx = noz_idx + offset
+            if thr_idx < 0 or thr_idx >= len(JetPump.throat_dia):
+                continue
+            dth_cat = JetPump.throat_dia[thr_idx]
+            dist = (dnz_opt - dnz_cat) ** 2 + (dth_opt - dth_cat) ** 2
+            if dist < best_dist:
+                best_dist = dist
+                best_nozzle = nozzle_no
+                best_ratio = letter
+
+    return JetPump(best_nozzle, best_ratio, knz, ken, kth, kdi)  # type: ignore

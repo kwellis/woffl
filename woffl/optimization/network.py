@@ -192,7 +192,7 @@ def optimize_jet_pumps(well_list: list[BatchPump], Qp_optm: np.ndarray, Qp_tot: 
         Qp_tot (float): The total available surface pump capacity, bwpd
 
     Returns:
-        no_idea (rawr): Need to figure this part out...
+        df_kp (DataFrame): Need to figure this part out...
     """
     discrete_list = []
 
@@ -254,6 +254,8 @@ def optimize_jet_pumps(well_list: list[BatchPump], Qp_optm: np.ndarray, Qp_tot: 
 
     solver.init(profit, [weight], [bag_size])
     solver.solve()
-    df_kp["select_high"] = [solver.best_solution_contains(i) for i in range(len(profit))]
+    df_kp["select_high"] = [
+        solver.best_solution_contains(i) for i in range(len(profit))
+    ]  # give true or false to round up
 
     return df_kp
