@@ -46,9 +46,8 @@ e41_batch = BatchPump(
 )
 
 df = e41_batch.batch_run(jp_list)
-print(df)
 df = e41_batch.process_results()
-print(df)
+print(df[df["semi"]])
 
 e41_batch.plot_data(water="lift", curve=True)
 e41_batch.plot_derv(water="lift")

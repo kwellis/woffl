@@ -208,7 +208,7 @@ class BatchPump:
         self.df = pd.DataFrame(results)
         return self.df  # should this be returned as none?
 
-    def search_run(self, seed: JetPump, debug: bool = False) -> pd.DataFrame:
+    def search_run(self, seed: JetPump, lift_cost: float = 0.03, debug: bool = False) -> pd.DataFrame:
         """Search Run using Nelder-Mead
 
         Use Nelder-Mead to find the continuous nozzle and throat diameters that maximize
@@ -216,8 +216,15 @@ class BatchPump:
         snapped to the nearest catalog jet pump. The final result is the actual performance
         of that catalog pump, solved through the full wellbore physics.
 
+        The lift_cost penalizes lift water (power fluid) usage. It represents the oil
+        production cost of each barrel of lift water, in bbl oil / bbl lift water. For
+        example, a lift_cost of 0.03 means 3 bbls of oil per 100 bbls of lift water.
+        A higher value favors smaller pumps that use less power fluid. A value of 0.0
+        maximizes oil with no regard for water usage.
+
         Args:
             seed (JetPump): Starting jet pump to seed the optimizer
+            lift_cost (float): Lift water penalty, bbl oil / bbl lift water
             debug (bool): True - Errors are Raised, False - Errors are Stored
 
         Returns:
@@ -230,7 +237,7 @@ class BatchPump:
                 return 1e10
             jp = continuous_jetpump(dnz, dth, seed.knz, seed.ken, seed.kth, seed.kdi)
             try:
-                _, _, qoil, _, _, _ = so.jetpump_solver(
+                _, _, qoil, _, lwat, _ = so.jetpump_solver(
                     self.pwh,
                     self.tsu,
                     self.ppf_surf,
@@ -242,7 +249,7 @@ class BatchPump:
                     self.prop_pf,
                     self.direction,
                 )
-                return -qoil
+                return -(qoil - lift_cost * lwat)
             except Exception:
                 return 1e10
 

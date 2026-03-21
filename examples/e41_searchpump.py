@@ -30,12 +30,32 @@ form_gor = 600  # formation gor
 e41_res = ResMix(wc=form_wc, fgor=form_gor, oil=mpu_oil, wat=mpu_wat, gas=mpu_gas)
 e41_profile = WellProfile.schrader()
 
-# seed with a mid-range jet pump and let Nelder-Mead find the best continuous size
 seed_jp = JetPump("12", "B")
 
 e41_batch = BatchPump(
     pwh, tsu, ppf_surf, wbore, e41_profile, e41_ipr, e41_res, mpu_wat, jpump_direction="reverse", wellname="MPE-41"
 )
 
-df = e41_batch.search_run(seed_jp)
-print(df)
+# first run the full batch to see the semi-finalist molwr values
+nozs = ["9", "10", "11", "12", "13", "14", "15", "16"]
+thrs = ["X", "A", "B", "C", "D", "E"]
+jp_list = BatchPump.jetpump_list(nozs, thrs)
+df_batch = e41_batch.batch_run(jp_list)
+df_batch = e41_batch.process_results()
+
+semi = df_batch[df_batch["semi"]][["nozzle", "throat", "qoil_std", "lift_wat", "molwr"]]
+print("=== Semi-Finalist MOLWR Values ===")
+print(semi.to_string(index=False))
+print()
+
+# now run search_run with different lift_cost penalties and see which pump it picks
+lift_costs = [0.0, 0.01, 0.02, 0.03, 0.04]
+
+print("=== Search Run with Different MOLWR Costs ===")
+for cost in lift_costs:
+    df = e41_batch.search_run(seed_jp, lift_cost=cost)
+    noz = df["nozzle"].iloc[0]
+    thr = df["throat"].iloc[0]
+    qoil = df["qoil_std"].iloc[0]
+    lwat = df["lift_wat"].iloc[0]
+    print(f"lift_cost={cost:.2f}  =>  {noz}{thr}  oil={qoil:.1f}  lift_wat={lwat:.1f}")
