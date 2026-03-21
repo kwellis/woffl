@@ -723,21 +723,19 @@ def snap_to_catalog(
     Returns:
         jp (JetPump): Nearest valid catalog Jet Pump
     """
-    best_dist = np.inf
-    best_nozzle = None
-    best_ratio = None
+    noz_dia = np.array(JetPump.nozzle_dia)
+    thr_dia = np.array(JetPump.throat_dia)
 
-    for noz_idx, dnz_cat in enumerate(JetPump.nozzle_dia):
-        nozzle_no = str(noz_idx + 1)
-        for letter, offset in JetPump.area_code.items():
-            thr_idx = noz_idx + offset
-            if thr_idx < 0 or thr_idx >= len(JetPump.throat_dia):
-                continue
-            dth_cat = JetPump.throat_dia[thr_idx]
-            dist = (dnz_opt - dnz_cat) ** 2 + (dth_opt - dth_cat) ** 2
-            if dist < best_dist:
-                best_dist = dist
-                best_nozzle = nozzle_no
-                best_ratio = letter
+    # snap nozzle first, then find best valid throat ratio
+    noz_idx = np.argmin((noz_dia - dnz_opt) ** 2)
 
-    return JetPump(best_nozzle, best_ratio, knz, ken, kth, kdi)  # type: ignore
+    best_letter = min(
+        JetPump.area_code,
+        key=lambda j: (
+            (thr_dia[noz_idx + JetPump.area_code[j]] - dth_opt) ** 2
+            if 0 <= noz_idx + JetPump.area_code[j] < len(thr_dia)
+            else np.inf
+        ),
+    )
+
+    return JetPump(str(noz_idx + 1), best_letter, knz, ken, kth, kdi)
