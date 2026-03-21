@@ -11,12 +11,12 @@ def test_water_density() -> None:
 
 
 def test_water_viscosity() -> None:
-    assert water.viscosity() == pytest.approx(0.75)
+    assert water.viscosity == pytest.approx(0.75)
 
 
 def test_water_compressibility() -> None:
-    assert water.compress() == pytest.approx(3.13e-6, rel=0.01)  # psi^-1
+    assert water.compress == pytest.approx(3.13e-6, rel=0.01)  # psi^-1
 
 
 def test_water_tension() -> None:
-    assert water.tension() == pytest.approx(0.005, rel=0.01)  # lbf/ft
+    assert water.tension == pytest.approx(0.005, rel=0.01)  # lbf/ft

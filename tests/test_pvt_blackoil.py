@@ -22,7 +22,7 @@ def compute_blackoil_data(
         py_gas = py_oil.condition(prs, temp)
 
         rho_oil.append(py_gas.density)
-        visc_oil.append(py_gas.viscosity())
+        visc_oil.append(py_gas.viscosity)
 
     pyoil = {"rho_oil": rho_oil, "visc_oil": visc_oil}
     return pyoil
@@ -58,4 +58,4 @@ def test_oil_viscosity(hysys_blackoil, python_blackoil) -> None:
 def test_oil_tension() -> None:
     py_boil = BlackOil.test_oil()
     py_boil.condition(2500, 80)
-    assert py_boil.tension() / 0.0000685 == pytest.approx(16.04, rel=0.01)  # dyne/cm
+    assert py_boil.tension / 0.0000685 == pytest.approx(16.04, rel=0.01)  # dyne/cm

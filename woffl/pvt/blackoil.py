@@ -135,6 +135,7 @@ class BlackOil:
         rs = self.solubility_kartoatmodjo(press, self.temp, self.oil_api, self.gas_sg)
         return rs
 
+    @property
     def compress(self) -> float:
         """Oil Compressibility Isothermal
 
@@ -169,7 +170,7 @@ class BlackOil:
         bo = self.fvf_kartoatmodjo_below(self.temp, self.oil_api, self.gas_sg, rs)
         if self.press > self.pbp:  # above bubblepoint pressure
             bob = bo
-            co = self.compress()
+            co = self.compress
             bo = self.fvf_vasquez_above(self.press, self.pbp, bob, co)
         return bo
 
@@ -190,6 +191,7 @@ class BlackOil:
         rho_oil = self.live_oil_density(self.oil_api, self.gas_sg, rs, bo)
         return rho_oil
 
+    @property
     def viscosity(self) -> float:
         """Live oil viscosity, cP
 
@@ -209,6 +211,7 @@ class BlackOil:
             uol = self.viscosity_live_kartoatmodjo_above(uob, self.press, self.pbp)
         return uol
 
+    @property
     def tension(self) -> float:
         """Live Oil Surface Tension
 

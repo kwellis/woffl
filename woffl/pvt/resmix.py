@@ -131,9 +131,9 @@ class ResMix:
             uwat (float): viscosity of water, cP
             ugas (float): viscosity of gas, cP
         """
-        uoil = self.oil.viscosity()
-        uwat = self.wat.viscosity()
-        ugas = self.gas.viscosity()
+        uoil = self.oil.viscosity
+        uwat = self.wat.viscosity
+        ugas = self.gas.viscosity
         return uoil, uwat, ugas
 
     def visc_two(self) -> tuple[float, float]:
@@ -167,6 +167,7 @@ class ResMix:
         umix = self._homogenous_mixture(yoil, ywat, ygas, uoil, uwat, ugas)
         return umix
 
+    @property
     def tension(self) -> float:
         """Surface Tension of Liquid Phase
 
@@ -176,8 +177,8 @@ class ResMix:
         Returns:
             sig_liq (float): Surface Tension Liquid, lbf/ft
         """
-        sig_oil = self.oil.tension()
-        sig_wat = self.wat.tension()
+        sig_oil = self.oil.tension
+        sig_wat = self.wat.tension
         yoil, ywat, ygas = self.volm_fract()  # volume fractions
         sig_liq = self._homogenous_liquid(yoil, ywat, sig_oil, sig_wat)
         return sig_liq
@@ -196,9 +197,9 @@ class ResMix:
             cw (float): compressibility of oil, psi**-1
             cg (float): compressibility of oil, psi**-1
         """
-        co = self.oil.compress()
-        cw = self.wat.compress()
-        cg = self.gas.compress()
+        co = self.oil.compress
+        cw = self.wat.compress
+        cg = self.gas.compress
         return co, cw, cg
 
     def mass_fract(self) -> tuple[float, float, float]:

@@ -14,7 +14,7 @@ vd_list = np.linspace(0, 6500, 100)
 
 # well with 600 fgor, 90% wc, 100 bopd
 mpu_wat = FormWater(wat_sg=1.0)
-print(f"Formation Water Viscosity: {mpu_wat.viscosity():.1f} cP")
+print(f"Formation Water Viscosity: {mpu_wat.viscosity:.1f} cP")
 qwat_bpd = 5000  # bwpd
 
 wellprof = WellProfile(md_list, vd_list, 7000)

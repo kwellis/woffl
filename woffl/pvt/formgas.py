@@ -91,6 +91,7 @@ class FormGas:
         self.tpr = self.tabs / self.tpc  # unitless, temperature pseudo reduced
         return self
 
+    @property
     def zfactor(self) -> float:
         """Gas Z-Factor Compressibility
 
@@ -120,10 +121,10 @@ class FormGas:
             Fundamental Principles of Reservoir Engineering, B.Towler (2002) Page 16
             Applied Multiphase Flow in Pipes..., Al-Safran and Brill (2017) Page 305
         """
-        zval = self.zfactor()
-        rho_gas = self.pabs * self.mw / (zval * FormGas._R * self.tabs)
+        rho_gas = self.pabs * self.mw / (self.zfactor * FormGas._R * self.tabs)
         return rho_gas
 
+    @property
     def viscosity(self) -> float:
         """Gas Viscosity, cP
 
@@ -138,6 +139,7 @@ class FormGas:
         ug = self._viscosity_lee(self.tabs, self.mw, self.density)
         return ug
 
+    @property
     def compress(self) -> float:
         """Gas Compressibility Isothermal
 
@@ -157,8 +159,8 @@ class FormGas:
         p1 = self.press
         p2 = p1 + 10  # add 100 psi to evaluate a different condition for compressibility
 
-        z1 = self.zfactor()
-        z2 = self.condition(p2, temp).zfactor()
+        z1 = self.zfactor
+        z2 = self.condition(p2, temp).zfactor
 
         cg = 1 / p1 - (1 / z1) * ((z2 - z1) / (p2 - p1))
         return cg

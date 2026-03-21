@@ -100,7 +100,7 @@ def beggs_diff_press(
     prop = prop.condition(pin, tin)
     qoil, qwat, qgas = prop.insitu_volm_flow(qoil_std)
     rho_liq, rho_gas = prop.rho_two()
-    sig_liq = prop.tension()
+    sig_liq = prop.tension
     nslh = prop.nslh()
 
     visc_mix = prop.visc_mix()
@@ -298,7 +298,7 @@ def powerfluid_top_down_friction(
     prop_pf = prop_pf.condition(ptop, ttop)
     qwat_fts = sp.bpd_to_ft3s(qwat_bpd)
     vel = sp.velocity(qwat_fts, area)
-    NRe = sp.reynolds(prop_pf.density, vel, hyd_dia, prop_pf.viscosity())  # need to refactor properties
+    NRe = sp.reynolds(prop_pf.density, vel, hyd_dia, prop_pf.viscosity)
     rel_ruff = sp.relative_roughness(hyd_dia, abs_ruff)
     ff = sp.ffactor_darcy(NRe, rel_ruff)
 

@@ -20,8 +20,8 @@ def compute_formgas_data(prs_ray: np.ndarray | list, temp: float, gas_sg: float)
         py_gas = py_gas.condition(prs, temp)
 
         rho_gas.append(py_gas.density)
-        visc_gas.append(py_gas.viscosity())
-        zfactor.append(py_gas.zfactor())
+        visc_gas.append(py_gas.viscosity)
+        zfactor.append(py_gas.zfactor)
 
     pygas = {"rho_gas": rho_gas, "visc_gas": visc_gas, "zfactor": zfactor}
     return pygas
@@ -61,7 +61,7 @@ def test_gas_compressibility() -> None:
     temp_mccain = 68
     mccain_compress = 0.001120
     methane = FormGas(gas_sg=0.55)
-    calc_compress = methane.condition(pres_mccain, temp_mccain).compress()
+    calc_compress = methane.condition(pres_mccain, temp_mccain).compress
     assert calc_compress == pytest.approx(mccain_compress, rel=0.03)
 
 

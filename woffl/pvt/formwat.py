@@ -87,6 +87,7 @@ class FormWater:
 
         return rho_wat
 
+    @property
     def viscosity(self) -> float:
         """Water Viscosity
 
@@ -101,10 +102,9 @@ class FormWater:
 
         # come back later and rewrite
         uwat = 0.75  # leave as 0.75 cP for now
-
-        self.uwat = uwat
         return uwat
 
+    @property
     def compress(self) -> float:
         """Water Isothermal Compressibility
 
@@ -125,6 +125,7 @@ class FormWater:
         cw = cw_si / 145.038  # 1/psi
         return cw
 
+    @property
     def tension(self) -> float:
         """Water Surface Tension
 
