@@ -11,8 +11,6 @@ import pandas as pd
 from ortools.algorithms.python import knapsack_solver
 
 import woffl.assembly.curvefit as cf
-import woffl.optimization.ratiotest as rt
-import woffl.optimization.rednewton as rn
 from woffl.assembly.batchrun import BatchPump, validate_water
 from woffl.geometry import JetPump
 
@@ -117,63 +115,6 @@ class WellNetwork:
 
         self.results = True  # tracker to know if results have been ran
         self.network_dict = network_dict
-
-
-def optimize_power_fluid(network_dict: dict, Qp_tot: float) -> tuple[float, np.ndarray, np.ndarray, int]:
-    """Optimize Power Fluid
-
-    Run a continuous reduced Newton optimization algorithm that allows each well to
-    be assigned an optimal power fluid rate. This power fluid rate is used to choose which
-    discrete jet pump most closely matches that power fluid rate from the semi-finalists.
-
-    Args:
-        network_dict (dict): Dictionary with Well Parameters on the Network
-        Qp_tot (float): Total Available Power Fluid to Split out
-
-    Return:
-        Qo (float): Maximized Oil Rate for the wells
-        Qp (np.array): Array of gradients for each well
-        dfk (np.array): Gradient at each well
-        k (int): Number of Iterations
-    """
-
-    Qp = rn.initial_powerfluid_alloc(network_dict, Qp_tot)  # split up power fluid
-    A, b = rn.constraint_spaces(network_dict, Qp_tot)
-    active = rn.constraint_active(A, b, Qp)  # active constraints
-    Z, Ar = rn.qr_split(A[active])
-    dfk = rn.update_gradient(network_dict, Qp)
-
-    optm_check, active, con_update = rn.optimality_test(dfk, Z, Ar, active)
-    if con_update:  # active constraint was removed
-        Z, Ar = rn.qr_split(A[active])  # update Z and Ar
-
-    k = 0
-    while optm_check is False:
-
-        dfk = rn.update_gradient(network_dict, Qp)
-        Hfk = rn.update_hessian(network_dict, Qp)
-
-        optm_check, active, con_update = rn.optimality_test(dfk, Z, Ar, active)
-        if con_update:  # active constraint was removed
-            Z, Ar = rn.qr_split(A[active])  # update Z and Ar
-
-        p = rn.newton_reduced(dfk, Hfk, Z)
-
-        alpha = rn.line_search_backtrack(rn.update_objective, network_dict, Qp, dfk, p)
-        tau, idx = rt.ratio_test(Qp, p, A[~active], b[~active], np.where(~active)[0])  # distance to constraints
-
-        if tau <= alpha:
-            alpha = tau
-            active[idx] = True  # active constraint added
-            Z, Ar = rn.qr_split(A[active])  # update Z and Ar
-
-        Qp = Qp + alpha * p
-
-        if k == 100:
-            break
-        k = k + 1
-
-    return rn.update_objective(network_dict, Qp), Qp, dfk, k
 
 
 def optimize_jet_pumps(well_list: list[BatchPump], Qp_optm: np.ndarray, Qp_tot: float) -> pd.DataFrame:
