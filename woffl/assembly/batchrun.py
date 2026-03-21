@@ -135,12 +135,11 @@ class BatchPump:
             jp_list.append(JetPump(nozzle, throat, knz, ken, kth, kdi))
         return jp_list
 
-    def batch_run(self, jetpumps: list[JetPump], debug: bool = False) -> pd.DataFrame:
-        """Batch Run of Jet Pumps
+    def _run_core(self, jetpumps: list[JetPump], debug: bool = False) -> pd.DataFrame:
+        """Core Jet Pump Solver Loop
 
-        Run through multiple different types of jet pumps. Results will be stored in
-        a dataframe where the results can be graphed and selected for the optimal pump.
-        The dataframe is added to the class as a variable for future inspection.
+        Run through multiple jet pumps and return results as a DataFrame
+        without modifying self.df.
 
         Args:
             jetpumps (list): List of JetPumps
@@ -198,9 +197,25 @@ class BatchPump:
                         "totl_wor": np.nan,
                         "error": exc,
                     }
-            results.append(result)  # add some progress bar code here?
-        self.df = pd.DataFrame(results)
-        return self.df  # should this be returned as none?
+            results.append(result)
+        return pd.DataFrame(results)
+
+    def batch_run(self, jetpumps: list[JetPump], debug: bool = False) -> pd.DataFrame:
+        """Batch Run of Jet Pumps
+
+        Run through multiple different types of jet pumps. Results will be stored in
+        a dataframe where the results can be graphed and selected for the optimal pump.
+        The dataframe is added to the class as a variable for future inspection.
+
+        Args:
+            jetpumps (list): List of JetPumps
+            debug (bool): True - Errors are Raised, False - Errors are Stored
+
+        Returns:
+            df (DataFrame): DataFrame of Jet Pump Results
+        """
+        self.df = self._run_core(jetpumps, debug)
+        return self.df
 
     def search_run(self, seed: JetPump, lift_cost: float = 0.03, debug: bool = False) -> pd.DataFrame:
         """Search Run using Nelder-Mead
@@ -259,9 +274,7 @@ class BatchPump:
         # snap to the nearest catalog jet pump and run the actual physics
         best_jp = snap_to_catalog(dnz_opt, dth_opt, seed.knz, seed.ken, seed.kth, seed.kdi)
 
-        # the problem with this line, is that it overwrites any previous batch_run()
-        # make a _batch_run that doesn't update the df? so you can call it here
-        df = self.batch_run([best_jp], debug)
+        df = self._run_core([best_jp], debug)
 
         # store the continuous optimum for reference
         df["dnz_opt"] = dnz_opt
