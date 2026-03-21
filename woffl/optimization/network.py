@@ -92,30 +92,6 @@ class WellNetwork:
         """Remove Well from the Network"""
         self.well_list.remove(well)
 
-    def network_run(self, jetpumps: list[JetPump], debug: bool = False) -> None:
-        """Network Run of Wells
-
-        Run through multiple wells with different types of jet pumps. Results are
-        stored as dataframes on each BatchPump and can be viewed later. Results
-        are processed for creating master curve and future plotting.
-
-        Args:
-            jetpumps (list): List of JetPumps
-            debug (bool): True - Errors are Raised, False - Errors are Stored
-        """
-        network_dict = {}  # store stuff to be passed into optimization algorithm
-        for well in self.well_list:
-            well.batch_run(jetpumps, debug)
-            well.process_results()
-
-            c1, c2, c3 = well.coeff_lift
-            network_dict.update(
-                {well.wellname: {"c1": c1, "c2": c2, "c3": c3, "qpf_min": well.qpf_min, "qpf_max": well.qpf_max}}
-            )
-
-        self.results = True  # tracker to know if results have been ran
-        self.network_dict = network_dict
-
 
 def optimize_jet_pumps(well_list: list[BatchPump], Qp_optm: np.ndarray, Qp_tot: float) -> pd.DataFrame:
     """Optimize Jet Pumps

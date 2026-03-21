@@ -55,8 +55,6 @@ class BatchPump:
         prop_pf: FormWater,
         jpump_direction: str = "reverse",
         wellname: str = "na",
-        qpf_min: float = 0,
-        qpf_max: float = 6000,
     ) -> None:
         """Batch Pump Solver
 
@@ -74,8 +72,6 @@ class BatchPump:
             prop_pf (FormWater): Powerfluid Properties
             jpump_direction (str): Jet Pump Direction, "reverse" or "forward"
             wellname (str): A unique identifier of the wellname
-            qpf_min (float): Min allowable powerfluid in optimization, bwpd
-            qpf_max (float): Max allowable powerfluid in optimization, bwpd
         """
         self.pwh = pwh
         self.tsu = tsu
@@ -87,8 +83,6 @@ class BatchPump:
         self.prop_pf = prop_pf
         self.direction = jpump_direction
         self.wellname = wellname
-        self.qpf_min = qpf_min
-        self.qpf_max = qpf_max
 
     def update_press(self, kind: str, psig: float) -> None:
         """Update Pressure
@@ -313,29 +307,6 @@ class BatchPump:
 
         return self.df
 
-    def theory_curves(self, mowr_ray: np.ndarray, water: str) -> tuple[np.ndarray, np.ndarray]:
-        """Theoretical Performace Curves
-
-        Create theoretical jet pump performance curves using marginal oil water rate
-        as the input. Generate arrays of the theoretical oil rat and water rate.
-
-        Args:
-            mowr_ray (np.ndarry): Marginal Oil Water Ratio, bbl/bbl
-            water (str): "lift" or "total" depending on the desired analysis
-
-        Returns:
-            qoil_std (np.ndarray): Oil Rate at different MOWR values
-            qwat_bpd (np.ndarray): Water Rate at different MOWR values
-        """
-        water = validate_water(water)
-        coeff = self.coeff_lift if water == "lift" else self.coeff_totl
-        a, b, c = coeff
-
-        qwat_bpd = np.array([cf.rev_exp_deriv(mowr, b, c) for mowr in mowr_ray])
-        qoil_std = np.array([cf.exp_model(qwat, a, b, c) for qwat in qwat_bpd])
-
-        return qoil_std, qwat_bpd
-
     def plot_data(
         self, water: str, curve: bool = False, ax: Axes | None = None, fig_path: str | os.PathLike | None = None
     ) -> None:
@@ -424,42 +395,6 @@ class BatchPump:
             plt.savefig(fig_path, dpi=300)
         else:
             plt.show()
-
-    def _plot_derv_network(self, water: str, ax: Axes, mcolor: str | mcolors.Colormap) -> None:
-        """Plot Derivative in a Network
-
-        Plot the derivative results from the jet pump batch run to visualize how
-        well of a match occured between the data and curve for each jet pump
-
-        Args:
-            water (str): "lift" or "total" depending on the desired x axis
-            curve (bool): Show the curve fit or not
-            ax (Axes): Matplotlib axes
-            mcolor (str): Matplotlib color
-        """
-        # Validate the 'water' argument
-        water = validate_water(water)
-        df_semi = self.df[self.df["semi"]]  # filter out the bad parts
-
-        # Determine the correct water data and coefficients
-        marg_semi = df_semi["molwr"] if water == "lift" else df_semi["motwr"]
-        qwat_semi = df_semi["lift_wat"] if water == "lift" else df_semi["totl_wat"]
-        coeff = self.coeff_lift if water == "lift" else self.coeff_totl
-
-        # calling the function to plot the derivatives
-        batch_plot_derv_base(
-            marg_filt=marg_semi,
-            qwat_filt=qwat_semi,
-            nozz_filt=df_semi["nozzle"],
-            thrt_filt=df_semi["throat"],
-            wellname=self.wellname,
-            coeff=coeff,
-            ax=ax,
-            mcolor=mcolor,
-            network=True,
-        )
-
-        return None
 
 
 def validate_water(water: str) -> str:
