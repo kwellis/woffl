@@ -10,7 +10,7 @@ Flag uncertainty — don't guess. If unsure about petroleum engineering concepts
 
 WOFFL (Water Optimization For Fluid Lift) — numerical solver for liquid-powered jet pumps with multiphase flow. Models subsurface oil well jet pump behavior and optimizes power fluid allocation across well networks.
 
-Python >=3.10, MIT license, published to PyPI via GitHub Actions on tag push.
+Python >=3.10, AGPL-3.0 license, published to PyPI via GitHub Actions on tag push.
 
 ## Commands
 
@@ -65,9 +65,9 @@ assembly.WellNetwork (multi-well power fluid allocation)
 
 - **pvt/** — Fluid property classes: `BlackOil`, `FormGas`, `FormWater`, `ResMix`. Each has a `condition(press, temp)` method that caches thermodynamic properties at given P/T. Preset class methods (e.g. `BlackOil.schrader()`) provide canned field configurations.
 
-- **geometry/** — `JetPump` (nozzle/throat catalogs from Champion X), `Pipe`/`PipeInPipe` (tubing/casing), `WellProfile` (MD/VD interpolation). Pipe presets: `four_half_tube()`, `three_half_tube()`.
+- **geometry/** — `JetPump` (nozzle/throat catalogs from Champion X), `Pipe`/`PipeInPipe` (tubing/casing), `WellProfile` (MD/VD interpolation). Pipe presets: `four_half_tube()`, `three_half_tube()`, `seven_case()`. WellProfile presets: `schrader()`, `kuparuk()`.
 
-- **flow/** — Core hydraulics. `singlephase.py` (friction, Reynolds), `twophase.py` (slip correlations), `jetflow.py` (nozzle/throat/diffuser energy balance), `outflow.py` (tubing pressure drop), `inflow.py` (Vogel IPR). Test validation references Crane TP-410.
+- **flow/** — Core hydraulics. `singlephase.py` (friction, Reynolds), `twophase.py` (slip correlations), `jetflow.py` (nozzle/throat/diffuser energy balance), `outflow.py` (tubing pressure drop), `inflow.py` (Vogel IPR), `jetplot.py` (`JetBook` class for storing jet pump calculation arrays + visualization helpers), `jetgraphs.py` (multi-parameter graph generation). Test validation references Crane TP-410.
 
 - **assembly/** — `BatchPump` ties everything together for a single well. Two modes:
   - `batch_run(jp_list)` — grid mode: iterates jet pump configurations, evaluates all combos.
@@ -128,7 +128,7 @@ Other conventions:
 - `prop_` prefix for ResMix objects: `prop_su`, `prop_pf`, `prop_tm`
 - `ff` = Darcy friction factor, `wc` = watercut, `fgor` = formation GOR, `rs` = solution GOR
 - `_ray` suffix = numpy array, `_list` = Python list, `_df` = DataFrame, `_book` = JetBook
-- Density uses `rho_` prefix (not `d` — some legacy pvt code uses `dwat`/`dgas` but `rho_` is preferred)
+- Density uses `rho_` prefix (not `d`)
 
 ## Docstring Style
 
@@ -177,4 +177,4 @@ Rules:
 
 ## Examples
 
-In `examples/`: `e41_singlepump.py`, `e41_batchpump.py` (grid search), `e41_searchpump.py` (Nelder-Mead search with lift_cost sweep), `epad_mckp.py` (multi-well MCKP network optimization), `flow_singlephase.py`/`flow_multiphase.py` (hydraulics demos).
+In `examples/`: `e41_singlepump.py`, `e41_batchpump.py` (grid search), `e41_searchpump.py` (Nelder-Mead search with lift_cost sweep), `e41_direction.py`, `epad_mckp.py` (multi-well MCKP network optimization), `flow_singlephase.py`/`flow_multiphase.py` (hydraulics demos).
