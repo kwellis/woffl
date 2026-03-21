@@ -9,7 +9,7 @@ from woffl.assembly.batchrun import BatchPump
 from woffl.flow.inflow import InFlow
 from woffl.geometry.pipe import Pipe, PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
-from woffl.optimization.mckp import optimize_mckp
+from woffl.assembly.network import optimize_jet_pumps
 from woffl.pvt.blackoil import BlackOil
 from woffl.pvt.formgas import FormGas
 from woffl.pvt.formwat import FormWater
@@ -66,18 +66,18 @@ for cfg in well_configs:
     print(f"{cfg['name']}: {semis} semi-finalists from {len(jp_list)} pumps")
 
 # optimize — every well must pump
-Qp_tot = 6000  # total available power fluid, bwpd
-df = optimize_mckp(wells, Qp_tot)
+qpf_tot = 6000  # total available power fluid, bwpd
+df = optimize_jet_pumps(wells, qpf_tot)
 
 print("\n=== MCKP Solution (All wells online) ===")
 print(df.to_string(index=False))
 print(f"\nTotal oil:   {df['qoil_std'].sum():.1f} bopd")
-print(f"Total water: {df['lift_wat'].sum():.1f} / {Qp_tot:.0f} bwpd")
+print(f"Total water: {df['lift_wat'].sum():.1f} / {qpf_tot:.0f} bwpd")
 
 # optimize — solver can shutin crummy wells
-df_si = optimize_mckp(wells, Qp_tot, allow_shutin=True)
+df_si = optimize_jet_pumps(wells, qpf_tot, allow_shutin=True)
 
 print("\n=== MCKP Solution (Shutin allowed) ===")
 print(df_si.to_string(index=False))
 print(f"\nTotal oil:   {df_si['qoil_std'].sum():.1f} bopd")
-print(f"Total water: {df_si['lift_wat'].sum():.1f} / {Qp_tot:.0f} bwpd")
+print(f"Total water: {df_si['lift_wat'].sum():.1f} / {qpf_tot:.0f} bwpd")
