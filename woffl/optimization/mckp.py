@@ -7,7 +7,6 @@ Replaces the two-phase approach (continuous reduced Newton + 0/1 knapsack)
 with a single discrete optimization over actual BatchPump simulation results.
 
 Solver: ortools CP-SAT
-Reference: Martello & Toth "Knapsack Problems" Chapter 11 (MCKP)
 """
 
 import numpy as np
