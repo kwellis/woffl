@@ -78,15 +78,14 @@ class FormWater:
             None
 
         Returns:
-            dwat (float): water density, lbm/ft3
+            rho_wat (float): water density, lbm/ft3
         """
 
         # leave it simple now, asume no compressibility
-        dwat = self.wat_sg * 62.4
-        dwat = round(dwat, 3)
+        rho_wat = self.wat_sg * 62.4
+        rho_wat = round(rho_wat, 3)
 
-        self.dwat = dwat
-        return dwat
+        return rho_wat
 
     def viscosity(self) -> float:
         """Water Viscosity

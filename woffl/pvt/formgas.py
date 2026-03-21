@@ -114,15 +114,15 @@ class FormGas:
             None
 
         Returns:
-            dgas (float): density of the gas, lbm/ft3
+            rho_gas (float): density of the gas, lbm/ft3
 
         References:
             Fundamental Principles of Reservoir Engineering, B.Towler (2002) Page 16
             Applied Multiphase Flow in Pipes..., Al-Safran and Brill (2017) Page 305
         """
-        zval = self.zfactor()  # call method if it hasn't been already?
-        dgas = self.pabs * self.mw / (zval * FormGas._R * self.tabs)
-        return dgas
+        zval = self.zfactor()
+        rho_gas = self.pabs * self.mw / (zval * FormGas._R * self.tabs)
+        return rho_gas
 
     def viscosity(self) -> float:
         """Gas Viscosity, cP

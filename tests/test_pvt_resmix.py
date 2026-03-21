@@ -1,14 +1,11 @@
 import json
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
 
 from woffl.pvt import BlackOil, FormGas, FormWater, ResMix
-
-# run command python -m tests.rmix_test is used
 
 
 def compute_resmix_data(
@@ -53,69 +50,39 @@ def compute_resmix_data(
     return pymix
 
 
-def plot_resmix_compare(hydict: dict, pydict: dict):
-    """Plot Reservoir Mixture
-
-    Compare the hysys generated with the python created mass and volm fractions
-    Used for if the tests failed and you are trying to understand why they failed
-    """
-    cats = ["oil", "wat", "gas"]
-    fig, axs = plt.subplots(3, sharex=True)
-    axs = np.array(axs).flatten()
-    for cat in cats:
-        axs[0].scatter(hydict["pres_psig"], hydict["mass_fracs"][cat], label=f"Hy {cat.capitalize()}")
-        axs[0].scatter(hydict["pres_psig"], pydict["mass_fracs"][cat], marker="*", label=f"Py {cat.capitalize()}")
-
-        axs[1].scatter(hydict["pres_psig"], hydict["volm_fracs"][cat], label=f"Hy {cat.capitalize()}")
-        axs[1].scatter(hydict["pres_psig"], pydict["volm_fracs"][cat], marker="*", label=f"Py {cat.capitalize()}")
-
-    axs[0].set_ylabel("Mass Fraction")
-    axs[0].legend()
-
-    axs[1].set_ylabel("Volume Fraction")
-    axs[1].legend()
-
-    axs[2].scatter(hydict["pres_psig"], hydict["rho_mix"], label="hysys")
-    axs[2].scatter(hydict["pres_psig"], pydict["rho_mix"], label="python")
-    axs[2].set_ylabel("Mixture Density, lbm/ft3")
-    axs[2].legend()
-    plt.show()
-
-    return None
+@pytest.fixture(scope="module")
+def hysys_resmix():
+    hysys_path = Path(__file__).parents[1] / "data" / "hysys_resmix_peng_rob.json"
+    with open(hysys_path) as json_file:
+        return json.load(json_file)
 
 
-hysys_path = Path(__file__).parents[1] / "data" / "hysys_resmix_peng_rob.json"
-with open(hysys_path) as json_file:
-    hymix = json.load(json_file)
-
-pymix = compute_resmix_data(
-    hymix["pres_psig"],
-    hymix["temp_degf"],
-    hymix["watercut"],
-    hymix["fgor"],
-    hymix["oil_api"],
-    hymix["pbub"],
-    hymix["gas_sg"],
-)
+@pytest.fixture(scope="module")
+def python_resmix(hysys_resmix):
+    return compute_resmix_data(
+        hysys_resmix["pres_psig"],
+        hysys_resmix["temp_degf"],
+        hysys_resmix["watercut"],
+        hysys_resmix["fgor"],
+        hysys_resmix["oil_api"],
+        hysys_resmix["pbub"],
+        hysys_resmix["gas_sg"],
+    )
 
 
-def test_mass_fractions() -> None:
+def test_mass_fractions(hysys_resmix, python_resmix) -> None:
     name_frac = "mass_fracs"
-    np.testing.assert_allclose(hymix[name_frac]["oil"], pymix[name_frac]["oil"], rtol=0.01)
-    np.testing.assert_allclose(hymix[name_frac]["wat"], pymix[name_frac]["wat"], rtol=0.01)
-    np.testing.assert_allclose(hymix[name_frac]["gas"], pymix[name_frac]["gas"], rtol=0.06)
+    np.testing.assert_allclose(hysys_resmix[name_frac]["oil"], python_resmix[name_frac]["oil"], rtol=0.01)
+    np.testing.assert_allclose(hysys_resmix[name_frac]["wat"], python_resmix[name_frac]["wat"], rtol=0.01)
+    np.testing.assert_allclose(hysys_resmix[name_frac]["gas"], python_resmix[name_frac]["gas"], rtol=0.06)
 
 
-def test_volm_fractions() -> None:
+def test_volm_fractions(hysys_resmix, python_resmix) -> None:
     name_frac = "volm_fracs"
-    np.testing.assert_allclose(hymix[name_frac]["oil"], pymix[name_frac]["oil"], rtol=0.03)
-    np.testing.assert_allclose(hymix[name_frac]["wat"], pymix[name_frac]["wat"], rtol=0.04)
-    np.testing.assert_allclose(hymix[name_frac]["gas"], pymix[name_frac]["gas"], rtol=0.06)
+    np.testing.assert_allclose(hysys_resmix[name_frac]["oil"], python_resmix[name_frac]["oil"], rtol=0.03)
+    np.testing.assert_allclose(hysys_resmix[name_frac]["wat"], python_resmix[name_frac]["wat"], rtol=0.04)
+    np.testing.assert_allclose(hysys_resmix[name_frac]["gas"], python_resmix[name_frac]["gas"], rtol=0.06)
 
 
-def test_mixture_density() -> None:
-    np.testing.assert_allclose(hymix["rho_mix"], pymix["rho_mix"], rtol=0.04)
-
-
-if __name__ == "__main__":
-    plot_resmix_compare(hymix, pymix)
+def test_mixture_density(hysys_resmix, python_resmix) -> None:
+    np.testing.assert_allclose(hysys_resmix["rho_mix"], python_resmix["rho_mix"], rtol=0.04)

@@ -58,7 +58,7 @@ flow (single/multiphase hydraulics, jet pump equations)
         ↓
 assembly.BatchPump (single-well solver — iterates nozzle/throat combos)
         ↓
-optimization.WellNetwork (multi-well power fluid allocation)
+assembly.WellNetwork (multi-well power fluid allocation)
 ```
 
 ### Package breakdown
@@ -75,18 +75,13 @@ optimization.WellNetwork (multi-well power fluid allocation)
   - Helper functions `continuous_jetpump()` (bypasses catalog lookup for arbitrary diameters) and `snap_to_catalog()` (finds nearest valid catalog pump by Euclidean distance).
   - `sysops.py` handles the physics: secant method (`qpf_secant`) for power fluid equilibrium. `curvefit.py` fits exponential models to batch results.
 
-- **optimization/** — Network-level allocation (no `__init__.py`; import modules directly). Two-phase approach:
-  1. `rednewton.py` — Reduced Newton method solves continuous relaxation: maximize total oil subject to per-well min/max and total power fluid constraints. Well model: `f(qp) = -c1 + c2*exp(-qp*c3)`.
-  2. `network.py` — `WellNetwork` class runs batch for all wells, then `optimize_power_fluid()` calls rednewton, then `optimize_jet_pumps()` uses 0/1 knapsack (ortools) to pick discrete jet pump sizes that bracket the continuous optimum.
+- **assembly/network.py** — `WellNetwork` class manages a collection of `BatchPump` wells sharing common header pressures (wellhead and power fluid). `optimize_jet_pumps(well_list, qpf_tot)` selects one jet pump per well via multiple-choice knapsack (ortools CP-SAT) to maximize total oil subject to shared power fluid capacity.
 
 ### Key solving patterns
 
 - **Secant method** for power fluid equilibrium in `sysops.py`
 - **Nelder-Mead** (scipy) for single-well continuous jet pump sizing in `batchrun.search_run`
-- **Reduced Newton with active-set constraints** in `rednewton.py` (QR factorization for null space/right inverse)
-- **Backtracking line search** with Armijo condition
-- **Ratio test** (`ratiotest.py`) for constraint activation during Newton steps
-- **Multiple-choice knapsack** (ortools CP-SAT) for discrete jet pump selection in network — replacing prior 0/1 knapsack approach
+- **Multiple-choice knapsack** (ortools CP-SAT) for multi-well discrete jet pump selection in `network.optimize_jet_pumps`
 
 ### Error handling
 
@@ -182,4 +177,4 @@ Rules:
 
 ## Examples
 
-In `examples/`: `e41_singlepump.py`, `e41_batchpump.py` (grid search), `e41_searchpump.py` (Nelder-Mead search with lift_cost sweep), `uaf_thesis.py` (network optimization), `flow_singlephase.py`/`flow_multiphase.py` (hydraulics demos).
+In `examples/`: `e41_singlepump.py`, `e41_batchpump.py` (grid search), `e41_searchpump.py` (Nelder-Mead search with lift_cost sweep), `epad_mckp.py` (multi-well MCKP network optimization), `flow_singlephase.py`/`flow_multiphase.py` (hydraulics demos).

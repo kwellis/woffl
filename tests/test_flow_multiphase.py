@@ -3,7 +3,6 @@ import pytest
 import woffl.flow.singlephase as sp
 import woffl.flow.twophase as tp
 
-# only works if the command python -m tests.flow_test is used
 
 book_Nd = 41.34
 book_Ngv = 9.29
