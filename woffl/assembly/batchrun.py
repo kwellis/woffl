@@ -20,7 +20,7 @@ import woffl.assembly.curvefit as cf
 import woffl.assembly.sysops as so
 from woffl.flow.inflow import InFlow
 from woffl.geometry.jetpump import JetPump
-from woffl.geometry.pipe import Pipe, PipeInPipe
+from woffl.geometry.pipe import PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
 from woffl.pvt import FormWater, ResMix
 
@@ -264,6 +264,9 @@ class BatchPump:
 
         # snap to the nearest catalog jet pump and run the actual physics
         best_jp = snap_to_catalog(dnz_opt, dth_opt, seed.knz, seed.ken, seed.kth, seed.kdi)
+
+        # the problem with this line, is that it overwrites any previous batch_run()
+        # make a _batch_run that doesn't update the df? so you can call it here
         df = self.batch_run([best_jp], debug)
 
         # store the continuous optimum for reference

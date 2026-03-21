@@ -59,3 +59,5 @@ for cost in lift_costs:
     qoil = df["qoil_std"].iloc[0]
     lwat = df["lift_wat"].iloc[0]
     print(f"lift_cost={cost:.2f}  =>  {noz}{thr}  oil={qoil:.1f}  lift_wat={lwat:.1f}")
+
+e41_batch.plot_data("lift", True)
