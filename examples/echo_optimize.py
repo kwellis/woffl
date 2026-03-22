@@ -5,15 +5,10 @@ across a network of wells. Each well runs a batch of jet pumps, then MCKP
 picks one pump per well to maximize total oil subject to shared capacity.
 """
 
-from woffl.assembly.batchpump import BatchPump
-from woffl.assembly.network import optimize_jet_pumps
+from woffl.assembly import BatchPump, WellNetwork
 from woffl.flow.inflow import InFlow
-from woffl.geometry.pipe import Pipe, PipeInPipe
-from woffl.geometry.wellprofile import WellProfile
-from woffl.pvt.blackoil import BlackOil
-from woffl.pvt.formgas import FormGas
-from woffl.pvt.formwat import FormWater
-from woffl.pvt.resmix import ResMix
+from woffl.geometry import JetPump, Pipe, PipeInPipe, WellProfile
+from woffl.pvt import BlackOil, FormGas, FormWater, ResMix
 
 # shared infrastructure
 pwh = 210  # psi, wellhead pressure
@@ -65,9 +60,10 @@ for cfg in well_configs:
     semis = well.df["semi"].sum()
     print(f"{cfg['name']}: {semis} semi-finalists from {len(jp_list)} pumps")
 
-# optimize — every well must pump
+# build network and optimize — every well must pump
 qpf_tot = 6000  # total available power fluid, bwpd
-df = optimize_jet_pumps(wells, qpf_tot)
+network = WellNetwork(pwh_hdr=None, ppf_hdr=None, well_list=wells, pad_name="Echo Pad")
+df = network.optimize(qpf_tot)
 
 print("\n=== MCKP Solution (All wells online) ===")
 print(df.to_string(index=False))
@@ -75,7 +71,7 @@ print(f"\nTotal oil:   {df['qoil_std'].sum():.1f} bopd")
 print(f"Total water: {df['lift_wat'].sum():.1f} / {qpf_tot:.0f} bwpd")
 
 # optimize — solver can shutin crummy wells
-df_si = optimize_jet_pumps(wells, qpf_tot, allow_shutin=True)
+df_si = network.optimize(qpf_tot, allow_shutin=True)
 
 print("\n=== MCKP Solution (Shutin allowed) ===")
 print(df_si.to_string(index=False))

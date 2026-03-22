@@ -1,18 +1,7 @@
-import matplotlib.pyplot as plt
-import numpy as np
-
 from woffl.assembly import solopump as so
-from woffl.flow import jetflow as jf
-from woffl.flow import jetgraphs as jg
-from woffl.flow import singlephase as sp
 from woffl.flow.inflow import InFlow
-from woffl.geometry.jetpump import JetPump
-from woffl.geometry.pipe import Pipe, PipeInPipe
-from woffl.geometry.wellprofile import WellProfile
-from woffl.pvt.blackoil import BlackOil
-from woffl.pvt.formgas import FormGas
-from woffl.pvt.formwat import FormWater
-from woffl.pvt.resmix import ResMix
+from woffl.geometry import JetPump, Pipe, PipeInPipe, WellProfile
+from woffl.pvt import BlackOil, FormGas, FormWater, ResMix
 
 # data from MPU E-41 Well Test on 11/27/2023
 # only works if the command python -m examples.e41_direction is used

@@ -1,12 +1,7 @@
-from woffl.assembly.batchpump import BatchPump
+from woffl.assembly import BatchPump, WellNetwork
 from woffl.flow.inflow import InFlow
-from woffl.geometry.jetpump import JetPump
-from woffl.geometry.pipe import Pipe, PipeInPipe
-from woffl.geometry.wellprofile import WellProfile
-from woffl.pvt.blackoil import BlackOil
-from woffl.pvt.formgas import FormGas
-from woffl.pvt.formwat import FormWater
-from woffl.pvt.resmix import ResMix
+from woffl.geometry import JetPump, Pipe, PipeInPipe, WellProfile
+from woffl.pvt import BlackOil, FormGas, FormWater, ResMix
 
 # data from MPU E-41 Well Test on 11/27/2023
 

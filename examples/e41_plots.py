@@ -8,6 +8,8 @@ from woffl.geometry import JetPump, Pipe, PipeInPipe, WellProfile
 from woffl.pvt import BlackOil, FormGas, FormWater, ResMix
 
 # data from MPU E-41 Well Test on 11/27/2023
+# look at math_optm with the folder called woffl_dumpster for some other figure codes
+# this code is for demonstrating all the plots beyond the standard one people look at
 
 surf_pres = 210
 jpump_tvd = 4065  # feet, interpolated off well profile
