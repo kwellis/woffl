@@ -4,15 +4,11 @@ Add mutliple BatchPumps to a network and provide a shared resource. The shared
 resource can be either lift water (power fluid) or total water.
 """
 
-import matplotlib.colors as mcolors
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from ortools.sat.python import cp_model
 
-import woffl.assembly.curvefit as cf
-from woffl.assembly.batchrun import BatchPump, validate_water
-from woffl.geometry import JetPump
+from woffl.assembly.batchrun import BatchPump
 
 SCALE = 100  # CP-SAT requires integers; multiply floats by this before rounding
 
@@ -93,6 +89,24 @@ class WellNetwork:
     def drop_well(self, well: BatchPump) -> None:
         """Remove Well from the Network"""
         self.well_list.remove(well)
+
+    def optimize(
+        self,
+        qpf_tot: float,
+        water_key: str = "lift_wat",
+        allow_shutin: bool = False,
+    ) -> pd.DataFrame:
+        """Run MCKP Optimization on Network Wells
+
+        Args:
+            qpf_tot (float): Total surface pump capacity, BWPD
+            water_key (str): Column for capacity constraint, "lift_wat" or "totl_wat"
+            allow_shutin (bool): If True, solver may shut in a well when its water is better used elsewhere
+
+        Returns:
+            df (DataFrame): One row per well with selected pump and rates
+        """
+        return optimize_jet_pumps(self.well_list, qpf_tot, water_key, allow_shutin)
 
 
 def optimize_jet_pumps(
@@ -190,8 +204,8 @@ def optimize_jet_pumps(
             results.append(
                 {
                     "wellname": well.wellname,
-                    "nozzle": "shutin",
-                    "throat": "shutin",
+                    "nozzle": "off",
+                    "throat": "off",
                     "qoil_std": 0.0,
                     "lift_wat": 0.0,
                     "form_wat": 0.0,
