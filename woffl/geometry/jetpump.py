@@ -54,7 +54,11 @@ class JetPump:
         0.8947,
     ]
 
+    # update to be called ratio_code
     area_code = {"X": -1, "A": 0, "B": 1, "C": 2, "D": 3, "E": 4}
+
+    # ratio_size is the throat / nozzle diameter ratio
+    ratio_size = {"X": 1.44, "A": 1.62, "B": 1.83, "C": 2.07, "D": 2.33, "E": 2.63}
 
     def __init__(
         self,
