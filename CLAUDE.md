@@ -73,7 +73,7 @@ assembly.WellNetwork (multi-well power fluid allocation)
   - `batch_run(jp_list)` — grid mode: iterates jet pump configurations, evaluates all combos.
   - `search_run(seed, lift_cost)` — search mode: uses Nelder-Mead to find the optimal continuous nozzle/throat diameters, then snaps to the nearest catalog pump. `lift_cost` (bbl oil / bbl lift water) penalizes power fluid usage; 0.0 = max oil, higher = favor smaller pumps.
   - Helper functions `continuous_jetpump()` (bypasses catalog lookup for arbitrary diameters) and `snap_to_catalog()` (finds nearest valid catalog pump by Euclidean distance).
-  - `solopump.py` handles the physics: secant method (`qpf_secant`) for power fluid equilibrium. `curvefit.py` fits exponential models to batch results.
+  - `solopump.py` handles the physics: secant method (`qpf_secant`) for power fluid equilibrium. `batchpump.py` also contains exponential curve fit functions for batch results.
 
 - **assembly/network.py** — `WellNetwork` class manages a collection of `BatchPump` wells sharing common header pressures (wellhead and power fluid). `optimize_jet_pumps(well_list, qpf_tot)` selects one jet pump per well via multiple-choice knapsack (ortools CP-SAT) to maximize total oil subject to shared power fluid capacity.
 

@@ -14,9 +14,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
-from scipy.optimize import minimize
+from scipy.optimize import curve_fit, minimize
 
-import woffl.assembly.curvefit as cf
 import woffl.assembly.solopump as so
 from woffl.flow.inflow import InFlow
 from woffl.geometry.jetpump import JetPump
@@ -315,8 +314,8 @@ class BatchPump:
 
         self.df = self.df.merge(semi_df[["motwr", "molwr"]], left_index=True, right_index=True, how="left")
 
-        self.coeff_totl = cf.batch_curve_fit(qoil_semi, twat_semi, origin=False)
-        self.coeff_lift = cf.batch_curve_fit(qoil_semi, lwat_semi, origin=False)
+        self.coeff_totl = batch_curve_fit(qoil_semi, twat_semi, origin=False)
+        self.coeff_lift = batch_curve_fit(qoil_semi, lwat_semi, origin=False)
 
         return self.df
 
@@ -552,7 +551,7 @@ def batch_plot_data(
     if coeff is not None:
         a, b, c = coeff  # parse out the coefficients for easier understanding
         fit_water = np.linspace(0, qwat_bpd.max(), 1000)
-        fit_oil = [cf.exp_model(wat, a, b, c) for wat in fit_water]
+        fit_oil = [exp_model(wat, a, b, c) for wat in fit_water]
         ax.plot(fit_water, fit_oil, color="red", linestyle="--", label="Exp. Fit")
 
     ax.set_xlabel(f"{water.capitalize()} Water Rate, BWPD")
@@ -606,7 +605,7 @@ def batch_plot_derv_base(
 
     a, b, c = coeff  # parse out the coefficients for easier understanding
     fit_water = np.linspace(0, qwat_filt.max(), 1000)
-    fit_grad = [cf.exp_deriv(wat, b, c) for wat in fit_water]
+    fit_grad = [exp_deriv(wat, b, c) for wat in fit_water]
     ax.plot(fit_water, fit_grad, color=mcolor, linestyle="--", label=label2)
 
     return None
@@ -690,3 +689,73 @@ def snap_to_catalog(
     )
 
     return JetPump(str(noz_idx + 1), best_letter, knz, ken, kth, kdi)
+
+
+def exp_model(x: float, a: float, b: float, c: float) -> float:
+    """Exponential Curve Fit
+
+    Args:
+        x (float): Water Rate, bwpd
+        a (float): Asymptote of the Curve
+        b (float): Constant
+        c (float): Constant
+
+    Returns
+        y (float): Oil Rate, bopd
+    """
+    return a - b * np.exp(-c * x)
+
+
+def exp_deriv(x: float, b: float, c: float) -> float:
+    """Derivative of Exponential Curve Fit
+
+    Args:
+        x (float): Water Rate, bwpd
+        b (float): Constant
+        c (float): Constant
+
+    Returns
+        s (float): Marginal Oil - Water Ratio, bbl/bbl
+    """
+    return c * b * np.exp(-c * x)
+
+
+def rev_exp_deriv(s: float, b: float, c: float) -> float:
+    """Reverse Derivative of Exponential Curve Fit
+
+    Args:
+        s (float): Marginal Oil - Water Ratio, bbl/bbl
+        b (float): Constant
+        c (float): Constant
+
+    Returns
+        x (float): Water Rate, bwpd
+    """
+    if s == 0:
+        s = 0.00001
+    x = -1 / c * np.log(s / (c * b))
+    x = max(x, 0)  # make sure s doesn't drop below zero
+    return x
+
+
+def batch_curve_fit(qoil_filt: np.ndarray, qwat_filt: np.ndarray, origin: bool = True) -> tuple[float, float, float]:
+    """Batch Curve Fit
+
+    Curve fit the filtered datapoints from the Batch Results
+
+    Args:
+        qoil_filt (list): Filtered Oil Array, bopd
+        qwat_filt (list): Filtered Water Array, bwpd
+        origin (bool): Add point to encourage intercepting at (0,0)
+
+    Returns:
+        coeff (float): a, b and c coefficients for curve fit
+    """
+    # add a point at 0,0 to force intercepting origin
+    if origin:
+        qoil_filt = np.append(qoil_filt, 0.0)
+        qwat_filt = np.append(qwat_filt, 0.0)
+
+    initial_guesses = [max(qoil_filt), max(qoil_filt), 0.001]
+    coeff, _ = curve_fit(exp_model, qwat_filt, qoil_filt, p0=initial_guesses)
+    return coeff
