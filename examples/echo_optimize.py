@@ -6,10 +6,10 @@ picks one pump per well to maximize total oil subject to shared capacity.
 """
 
 from woffl.assembly.batchpump import BatchPump
+from woffl.assembly.network import optimize_jet_pumps
 from woffl.flow.inflow import InFlow
 from woffl.geometry.pipe import Pipe, PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
-from woffl.assembly.network import optimize_jet_pumps
 from woffl.pvt.blackoil import BlackOil
 from woffl.pvt.formgas import FormGas
 from woffl.pvt.formwat import FormWater
