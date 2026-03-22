@@ -85,32 +85,32 @@ class JetPump:
             None
         """
 
-        self.noz_no = str(nozzle_no)
-        self.rat_ar = str(area_ratio)
+        area_ratio = str(area_ratio).upper()
+        if area_ratio not in JetPump.area_code:
+            valid = ", ".join(JetPump.area_code.keys())
+            raise ValueError(f"Area ratio '{area_ratio}' not recognized, valid options: {valid}")
+
+        nozzle_no = str(nozzle_no)
+        noz_int = int(nozzle_no)  # raises ValueError for non-numeric strings
+        if noz_int < 1 or noz_int > len(JetPump.nozzle_dia):
+            raise ValueError(f"Nozzle size {nozzle_no} out of range, valid: 1-{len(JetPump.nozzle_dia)}")
+
+        self.noz_no = nozzle_no
+        self.rat_ar = area_ratio
 
         self.knz = knz
         self.ken = ken
         self.kth = kth
         self.kdi = kdi
 
-        nozzle_idx = int(nozzle_no) - 1
+        nozzle_idx = noz_int - 1
         throat_idx = nozzle_idx + JetPump.area_code[area_ratio]
 
-        dnz = None
-        dth = None
+        if throat_idx < 0 or throat_idx >= len(JetPump.throat_dia):
+            raise ValueError(f"Nozzle throat combo {nozzle_no}{area_ratio} out of catalog range")
 
-        try:
-            dnz = JetPump.nozzle_dia[nozzle_idx]
-        except IndexError:
-            print(f"Nozzle Size {nozzle_no} not recognized")
-
-        try:
-            dth = JetPump.throat_dia[throat_idx]
-        except IndexError:
-            print(f"Nozzle Throat Combo {str(nozzle_no) + str(area_ratio)} not recognized")
-
-        self.dnz = dnz
-        self.dth = dth
+        self.dnz = JetPump.nozzle_dia[nozzle_idx]
+        self.dth = JetPump.throat_dia[throat_idx]
 
     def __repr__(self):
         return f"{self.noz_no + self.rat_ar} Jet Pump, Nozzle: {self.dnz} inches, Throat: {self.dth} inches"
