@@ -5,7 +5,7 @@ across a network of wells. Each well runs a batch of jet pumps, then MCKP
 picks one pump per well to maximize total oil subject to shared capacity.
 """
 
-from woffl.assembly.batchrun import BatchPump
+from woffl.assembly.batchpump import BatchPump
 from woffl.flow.inflow import InFlow
 from woffl.geometry.pipe import Pipe, PipeInPipe
 from woffl.geometry.wellprofile import WellProfile

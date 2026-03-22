@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from woffl.assembly import sysops as so
+from woffl.assembly import solopump as so
 from woffl.flow import jetflow as jf
 from woffl.flow import jetgraphs as jg
 from woffl.flow import singlephase as sp

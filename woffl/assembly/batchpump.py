@@ -17,7 +17,7 @@ from matplotlib.axes import Axes
 from scipy.optimize import minimize
 
 import woffl.assembly.curvefit as cf
-import woffl.assembly.sysops as so
+import woffl.assembly.solopump as so
 from woffl.flow.inflow import InFlow
 from woffl.geometry.jetpump import JetPump
 from woffl.geometry.pipe import PipeInPipe

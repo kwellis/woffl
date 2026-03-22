@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from woffl.assembly.batchrun import BatchPump
+from woffl.assembly.batchpump import BatchPump
 from woffl.flow.inflow import InFlow
 from woffl.geometry.jetpump import JetPump
 from woffl.geometry.pipe import Pipe, PipeInPipe

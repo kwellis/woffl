@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from ortools.sat.python import cp_model
 
-from woffl.assembly.batchrun import BatchPump
+from woffl.assembly.batchpump import BatchPump
 
 SCALE = 100  # CP-SAT requires integers; multiply floats by this before rounding
 

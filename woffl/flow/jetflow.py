@@ -676,7 +676,7 @@ def jetpump_base_calcs(
     Solve the jetpump equations, calculating out the expected discharge conditions.
     Function dete_zero() will raise a ValueError if the selected psu is too low. This method is
     being depreciated because it assumes a fixed powerfluid pressure directly at the jet pump. In
-    practice this is difficult. Part of the code is being moved into "sysops" file under the
+    practice this is difficult. Part of the code is being moved into "solopump" file under the
     discharge residual code so a power fluid rate iteration can be added. Additionally, discharge
     residual will allow for defining if the jetpump is forward or reverse circulating.
 

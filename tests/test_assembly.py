@@ -7,7 +7,7 @@ Asserts physically reasonable outputs — not exact values.
 
 import pytest
 
-from woffl.assembly.batchrun import BatchPump
+from woffl.assembly.batchpump import BatchPump
 from woffl.assembly.network import optimize_jet_pumps
 from woffl.flow.inflow import InFlow
 from woffl.geometry.jetpump import JetPump

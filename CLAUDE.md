@@ -73,21 +73,21 @@ assembly.WellNetwork (multi-well power fluid allocation)
   - `batch_run(jp_list)` — grid mode: iterates jet pump configurations, evaluates all combos.
   - `search_run(seed, lift_cost)` — search mode: uses Nelder-Mead to find the optimal continuous nozzle/throat diameters, then snaps to the nearest catalog pump. `lift_cost` (bbl oil / bbl lift water) penalizes power fluid usage; 0.0 = max oil, higher = favor smaller pumps.
   - Helper functions `continuous_jetpump()` (bypasses catalog lookup for arbitrary diameters) and `snap_to_catalog()` (finds nearest valid catalog pump by Euclidean distance).
-  - `sysops.py` handles the physics: secant method (`qpf_secant`) for power fluid equilibrium. `curvefit.py` fits exponential models to batch results.
+  - `solopump.py` handles the physics: secant method (`qpf_secant`) for power fluid equilibrium. `curvefit.py` fits exponential models to batch results.
 
 - **assembly/network.py** — `WellNetwork` class manages a collection of `BatchPump` wells sharing common header pressures (wellhead and power fluid). `optimize_jet_pumps(well_list, qpf_tot)` selects one jet pump per well via multiple-choice knapsack (ortools CP-SAT) to maximize total oil subject to shared power fluid capacity.
 
 ### Key solving patterns
 
-- **Secant method** for power fluid equilibrium in `sysops.py`
-- **Nelder-Mead** (scipy) for single-well continuous jet pump sizing in `batchrun.search_run`
+- **Secant method** for power fluid equilibrium in `solopump.py`
+- **Nelder-Mead** (scipy) for single-well continuous jet pump sizing in `batchpump.search_run`
 - **Multiple-choice knapsack** (ortools CP-SAT) for multi-well discrete jet pump selection in `network.optimize_jet_pumps`
 
 ### Error handling
 
 <!-- TODO: Has ConvergenceError been implemented? If so, remove this note and update the description below to reflect current state. -->
 
-Inner solvers (jetflow, sysops) raise on convergence failure. Batch-level code (`batch_run`, `network_run`) uses a `debug` flag:
+Inner solvers (jetflow, solopump) raise on convergence failure. Batch-level code (`batch_run`, `network_run`) uses a `debug` flag:
 - `debug=False` (default): catch convergence errors, store in results as NaN, continue to next pump
 - `debug=True`: re-raise so the traceback is visible for debugging a specific failure
 - `search_run` optimizer objective always catches convergence errors and returns `1e10` penalty to let Nelder-Mead continue
