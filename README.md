@@ -1,6 +1,6 @@
 ![woffl_github7](https://github.com/kwellis/woffl/assets/62774251/8b80146f-a503-4576-8f43-f1aa45d93a05)
 
-Woffl /ˈwɑː.fəl/ is a Python library for numerical modeling of subsurface jet pump oil wells.   
+Woffl /ˈwɑː.fəl/ is a Python library for numerical modeling and optimization of subsurface jet pump oil wells.
 
 ## Installation   
 
@@ -70,62 +70,103 @@ The other benefit of the wellprofile is the ability to visual what the wellprofi
 wprof.plot_raw()
 wprof.plot_filter()
 ```
-### JetPump   
+### JetPump
 
-The jetpump class defines the geometry of the jetpump. Currently only National pump geometries are defined. The pump is defined by passing a nozzle number and area ratio. Friction factors of the pumps nozzle, enterance, throat and diffuser are optional arguements.   
+The JetPump class defines the geometry of the jet pump. Currently only Champion X (National) pump geometries are defined. The pump is defined by passing a nozzle number and area ratio. Friction loss coefficients for the nozzle, entrance, throat and diffuser are optional arguments.
 
 ```python
 from woffl.geometry import JetPump
 
 jpump = JetPump(nozzle_no="12", area_ratio="B")
 ```
-### Pipe and Annulus   
+### Pipe and PipeInPipe
 
-The Pipe and Annulus class defines how large the tubing and casing are in the well. Currently only the tubing needs to be defined for solving the jetpump performance. Future work will incorporate the annular geometry to account for annular friction in the well.  
-
-```python
-from woffl.geometry import Pipe, Annulus
-
-tube = Pipe(out_dia=4.5, thick=0.5)
-case = Pipe(out_dia=6.875, thick=0.5)
-annul = Annulus(inn_pipe=tube, out_pipe=case)
-```
-Simple geometries of the Pipe and Annulus can be accessed, such as the hydraulic diameter and cross sectional area.
+The Pipe and PipeInPipe classes define the tubing and casing geometry in the well. Two Pipe objects are combined into a PipeInPipe to represent the wellbore, which is used by the solver to account for friction losses in both the tubing and annulus depending on circulation direction.
 
 ```python
-tube_id = tube.inn_dia
-tube_area = tube.inn_area
+from woffl.geometry import Pipe, PipeInPipe
 
-ann_dhyd = annul.hyd_dia
-ann_area = annul.ann_area
+tubing = Pipe(out_dia=4.5, thick=0.5)
+casing = Pipe(out_dia=6.875, thick=0.5)
+wbore = PipeInPipe(inn_pipe=tubing, out_pipe=casing)
+```
+Simple geometries of the Pipe and PipeInPipe can be accessed, such as the hydraulic diameter and cross sectional area.
+
+```python
+tube_id = tubing.inn_dia
+tube_area = tubing.inn_area
+
+ann_dhyd = wbore.ann_hyd_dia
+ann_area = wbore.ann_area
 ```
 
-### Assembly   
+### Assembly - Batch Run
 
-The assembly module is used to combine the previously defined classes into a system that can be used for solving. The assembly code is still being developed and currently is a mix of classes and a few fuctions. The critical class is the BatchPump class, allowing multiple pumps to be run across a defined system.    
+The assembly module combines the previously defined classes into a system that can be solved. The BatchPump class iterates across a grid of nozzle and throat combinations. After running, `process_results()` identifies semi-finalist pumps (Pareto frontier — no other pump makes more oil for less water) and calculates marginal gradients.
 
 ```python
 from woffl.assembly import BatchPump
 
-nozs = ["8", "9", "10", "11", "12", "13", "14", "15", "16"]
+nozs = ["9", "10", "11", "12", "13", "14", "15", "16"]
 thrs = ["X", "A", "B", "C", "D", "E"]
-
-well_batch = BatchPump(pwh=220, tsu=82, rho_pf=62.4, ppf_surf=2800, wellbore=tube, wellprof=wprof, ipr_su=ipr, prop_su=fmix)
 jp_list = BatchPump.jetpump_list(nozs, thrs)
 
-result_dict = well_batch.batch_run(jp_list)
+well = BatchPump(
+    pwh=210, tsu=80, ppf_surf=3168,
+    wellbore=wbore, wellprof=wprof, ipr_su=ipr, prop_su=fmix,
+    prop_pf=fwat, jpump_direction="reverse", wellname="MPE-41",
+)
+
+df = well.batch_run(jp_list)
+df = well.process_results()
+print(df[df["semi"]])
+
+well.plot_data(water="lift", curve=True)
+well.plot_derv(water="lift")
 ```
 
-The results dictionary can be passed into a Pandas Dataframe and used for results analysis. A few simple functions have been written to easily visualize the results.   
+### Assembly - Search Run
+
+For single-well optimization, `search_run()` uses Nelder-Mead to find the optimal continuous nozzle and throat diameters, then snaps the result to the nearest catalog pump. The `lift_cost` parameter penalizes power fluid usage — 0.0 maximizes oil regardless of water, higher values favor smaller pumps.
 
 ```python
-import pandas as pd
-from woffl.assembly import batch_results_mask, batch_results_plot
+seed_jp = JetPump("12", "B")
 
-df = pd.DataFrame(result_dict)
-mask_pump = batch_results_mask(df["qoil_std"], df["total_water"])
-batch_results_plot(df["qoil_std"], df["total_water"], df["nozzle"], df["throat"], mask=mask_pump)
+df = well.search_run(seed_jp, lift_cost=0.03)
+print(df[["nozzle", "throat", "qoil_std", "lift_wat"]])
 ```
+
+### Assembly - Well Network
+
+The WellNetwork class manages multiple wells sharing a common power fluid supply. It uses a multiple-choice knapsack solver (ortools CP-SAT) to select one jet pump per well that maximizes total oil production subject to the shared power fluid capacity.
+
+```python
+from woffl.assembly import WellNetwork
+
+# build and solve each well
+wells = [well_a, well_b, well_c, well_d]
+for w in wells:
+    w.batch_run(jp_list)
+    w.process_results()
+
+# optimize across the network
+network = WellNetwork(pwh_hdr=None, ppf_hdr=None, well_list=wells, pad_name="Echo Pad")
+df = network.optimize(qpf_tot=6000)
+print(df.to_string(index=False))
+
+# allow shutting in low-value wells
+df_si = network.optimize(qpf_tot=6000, allow_shutin=True)
+```
+
+## Examples
+
+The `examples/` directory contains runnable scripts demonstrating different workflows:
+
+- `e41_singlepump.py` — Single well, single pump evaluation with detailed jet pump plots
+- `e41_batchpump.py` — Grid search over nozzle/throat combos with semi-finalist analysis
+- `e41_searchpump.py` — Nelder-Mead optimization with lift cost sensitivity sweep
+- `e41_direction.py` — Forward vs reverse circulation comparison
+- `echo_optimize.py` — Multi-well network optimization with shared power fluid
 
 ## Background
 
