@@ -7,9 +7,8 @@ Asserts physically reasonable outputs — not exact values.
 
 import pytest
 
+from tests.asm_helper import jp_list, make_well
 from woffl.assembly.network import optimize_jet_pumps
-from tests.asm_helper import make_well, jp_list
-
 
 # ---- fixture ----
 
@@ -34,6 +33,7 @@ def network_wells():
 
 # ---- MCKP tests ----
 
+
 class TestOptimizeJetPumps:
     """Smoke tests for optimize_jet_pumps (MCKP solver)"""
 
@@ -52,9 +52,7 @@ class TestOptimizeJetPumps:
 
     def test_tight_capacity_respected(self, network_wells):
         """Set capacity tight enough to bind the constraint."""
-        min_water = sum(
-            well.df[well.df["semi"]]["lift_wat"].min() for well in network_wells
-        )
+        min_water = sum(well.df[well.df["semi"]]["lift_wat"].min() for well in network_wells)
         qpf_tot = min_water + 100  # just above minimum
         df = optimize_jet_pumps(network_wells, qpf_tot=qpf_tot)
         assert df["lift_wat"].sum() <= qpf_tot
@@ -64,7 +62,7 @@ class TestOptimizeJetPumps:
         df = optimize_jet_pumps(network_wells, qpf_tot=100_000)
         for well in network_wells:
             best = well.df[well.df["semi"]]["qoil_std"].max()
-            selected = df.loc[df["wellname"] == well.wellname, "qoil_std"].iloc[0]
+            selected = df.loc[df["wellname"] == well.wellname, "qoil_std"].iloc[0]  # type: ignore
             assert selected == pytest.approx(best, rel=0.01)
 
     def test_infeasible_raises(self, network_wells):
