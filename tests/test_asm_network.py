@@ -59,6 +59,14 @@ class TestOptimizeJetPumps:
         df = optimize_jet_pumps(network_wells, qpf_tot=qpf_tot)
         assert df["lift_wat"].sum() <= qpf_tot
 
+    def test_unlimited_picks_best_pump(self, network_wells):
+        """With excess power fluid, each well should pick its max-oil semi-finalist."""
+        df = optimize_jet_pumps(network_wells, qpf_tot=100_000)
+        for well in network_wells:
+            best = well.df[well.df["semi"]]["qoil_std"].max()
+            selected = df.loc[df["wellname"] == well.wellname, "qoil_std"].iloc[0]
+            assert selected == pytest.approx(best, rel=0.01)
+
     def test_infeasible_raises(self, network_wells):
         with pytest.raises(RuntimeError, match="infeasible"):
             optimize_jet_pumps(network_wells, qpf_tot=10)
