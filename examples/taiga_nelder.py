@@ -33,7 +33,7 @@ lift_cost = 0.05
 
 results = []
 end_gor = 2600
-gor_ray = np.linspace(200, end_gor, 5)
+gor_ray = np.linspace(200, end_gor, 6)
 for form_gor in gor_ray:
     print(f"Running {form_gor} GOR Case")
     res_mix = ResMix(wc=form_wc, fgor=float(form_gor), oil=mpu_oil, wat=mpu_wat, gas=mpu_gas)
