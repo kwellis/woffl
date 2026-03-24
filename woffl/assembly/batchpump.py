@@ -751,8 +751,16 @@ def throat_run(
         jp = continuous_jetpump(dnz, dth, seed.knz, seed.ken, seed.kth, seed.kdi)
         try:
             _, _, qoil, _, lwat, _ = so.jetpump_solver(
-                bp.pwh, bp.tsu, bp.ppf_surf, jp, bp.wellbore, bp.wellprof,
-                bp.ipr_su, bp.prop_su, bp.prop_pf, bp.direction,
+                bp.pwh,
+                bp.tsu,
+                bp.ppf_surf,
+                jp,
+                bp.wellbore,
+                bp.wellprof,
+                bp.ipr_su,
+                bp.prop_su,
+                bp.prop_pf,
+                bp.direction,
             )
             return -(qoil - lift_cost * lwat)
         except Exception:
@@ -806,8 +814,16 @@ def ratio_run(
         jp = continuous_jetpump(dnz, dth, seed.knz, seed.ken, seed.kth, seed.kdi)
         try:
             _, _, qoil, _, lwat, _ = so.jetpump_solver(
-                bp.pwh, bp.tsu, bp.ppf_surf, jp, bp.wellbore, bp.wellprof,
-                bp.ipr_su, bp.prop_su, bp.prop_pf, bp.direction,
+                bp.pwh,
+                bp.tsu,
+                bp.ppf_surf,
+                jp,
+                bp.wellbore,
+                bp.wellprof,
+                bp.ipr_su,
+                bp.prop_su,
+                bp.prop_pf,
+                bp.direction,
             )
             return -(qoil - lift_cost * lwat)
         except Exception:
@@ -824,7 +840,10 @@ def ratio_run(
 
     # relaxed tolerances — only need to land between two catalog sizes
     result = minimize(
-        objective, x0, method="Nelder-Mead", bounds=bounds,
+        objective,
+        x0,
+        method="Nelder-Mead",
+        bounds=bounds,
         options={"fatol": 1.0},
     )
     dnz_opt, ratio_opt = result.x
