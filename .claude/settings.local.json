@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:\\\\Users\\\\ka9612\\\\OneDrive - Hilcorp\\\\vs_code\\\\woffl\" && python -m pytest tests/test_flow_singlephase.py -v 2>&1)"
+    ]
+  }
+}
