@@ -4,16 +4,12 @@ from woffl.flow import jetflow as jf
 from woffl.flow import jetgraphs as jg
 from woffl.flow import jetplot as jplt
 from woffl.flow.inflow import InFlow
-from woffl.geometry.jetpump import JetPump
-from woffl.geometry.pipe import Annulus, Pipe
-from woffl.geometry.wellprofile import WellProfile
-from woffl.pvt.blackoil import BlackOil
-from woffl.pvt.formgas import FormGas
-from woffl.pvt.formwat import FormWater
-from woffl.pvt.resmix import ResMix
+from woffl.geometry import JetPump, Pipe, PipeInPipe, WellProfile
+from woffl.pvt import BlackOil, FormGas, FormWater, ResMix
 
 # data from MPU E-41 Well Test on 11/27/2023
-# only works if the command python -m tests.e41_test is used
+# look at math_optm with the folder called woffl_dumpster for some other figure codes
+# this code is for demonstrating all the plots beyond the standard one people look at
 
 surf_pres = 210
 jpump_tvd = 4065  # feet, interpolated off well profile
@@ -23,7 +19,7 @@ ppf_surf = 3168  # psi, power fluid surf pressure 3168
 # testing the jet pump code on E-41
 tube = Pipe(out_dia=4.5, thick=0.5)  # E-42 tubing
 case = Pipe(out_dia=6.875, thick=0.5)  # E-42 casing
-ann = Annulus(inn_pipe=tube, out_pipe=case)  # define the annulus
+ann = PipeInPipe(inn_pipe=tube, out_pipe=case)  # define the annulus
 
 e41_ipr = InFlow(qwf=246, pwf=1049, pres=1400)  # define an ipr
 

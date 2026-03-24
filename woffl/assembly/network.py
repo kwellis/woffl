@@ -4,14 +4,13 @@ Add mutliple BatchPumps to a network and provide a shared resource. The shared
 resource can be either lift water (power fluid) or total water.
 """
 
-import matplotlib.colors as mcolors
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from ortools.sat.python import cp_model
 
-import woffl.assembly.curvefit as cf
-from woffl.assembly.batchrun import BatchPump, validate_water
-from woffl.geometry import JetPump
+from woffl.assembly.batchpump import BatchPump
+
+SCALE = 100  # CP-SAT requires integers; multiply floats by this before rounding
 
 
 class WellNetwork:
@@ -91,205 +90,127 @@ class WellNetwork:
         """Remove Well from the Network"""
         self.well_list.remove(well)
 
-    def network_run(self, jetpumps: list[JetPump], debug: bool = False) -> None:
-        """Network Run of Wells
-
-        Run through multiple wells with different types of jet pumps. Results are
-        stored as dataframes on each BatchPump and can be viewed later. Results
-        are processed for creating master curve and future plotting.
-
-        Args:
-            jetpumps (list): List of JetPumps
-            debug (bool): True - Errors are Raised, False - Errors are Stored
-        """
-        for well in self.well_list:
-            well.batch_run(jetpumps, debug)
-            well.process_results()
-        self.results = True  # tracker to know if results have been ran
-
-    def master_curves(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Create the Network Master Curves
-
-        Creates two master curves that are used for optimizing jet pumps selection
-        on the network selection.
+    def optimize(
+        self,
+        qpf_tot: float,
+        water_key: str = "lift_wat",
+        allow_shutin: bool = False,
+    ) -> pd.DataFrame:
+        """Run MCKP Optimization on Network Wells
 
         Args:
-            None
+            qpf_tot (float): Total surface pump capacity, BWPD
+            water_key (str): Column for capacity constraint, "lift_wat" or "totl_wat"
+            allow_shutin (bool): If True, solver may shut in a well when its water is better used elsewhere
 
         Returns:
-            mowr_ray (np.ndarray): Marginal Oil Water Ratio
-            lwat_pad (np.ndarray): Lift Water of the Pad, BWPD
-            twat_pad (np.ndarray): Total Water of the Pad, BWPD
+            df (DataFrame): One row per well with selected pump and rates
         """
-        if self.results is False:
-            raise ValueError("Run network before generating master curves")
+        return optimize_jet_pumps(self.well_list, qpf_tot, water_key, allow_shutin)
 
-        mowr_ray = np.arange(0.01, 1.1, 0.01)
-        lwat_pad = np.zeros_like(mowr_ray)
-        twat_pad = np.zeros_like(mowr_ray)
 
-        loil_pad = np.zeros_like(mowr_ray)  # oil rate predicted using lift water coeff
-        toil_pad = np.zeros_like(mowr_ray)  # oil rate predicted using total water coeff
+def optimize_jet_pumps(
+    well_list: list[BatchPump],
+    qpf_tot: float,
+    water_key: str = "lift_wat",
+    allow_shutin: bool = False,
+) -> pd.DataFrame:
+    """Optimize Jet Pumps via Multiple-Choice Knapsack
 
-        for well in self.well_list:
+    Each well picks exactly one jet pump from its semi-finalists to maximize
+    total oil production subject to a shared power fluid capacity constraint.
+    Uses the CP-SAT solver from ortools.
 
-            qoil_lift, lwat_well = well.theory_curves(mowr_ray, "lift")
-            qoil_totl, twat_well = well.theory_curves(mowr_ray, "total")
+    Args:
+        well_list (list[BatchPump]): Wells with batch_run() and process_results() already called
+        qpf_tot (float): Total surface pump capacity, BWPD
+        water_key (str): Column for capacity constraint, "lift_wat" or "totl_wat"
+        allow_shutin (bool): If True, solver may shut in a well when its water is better used elsewhere
 
-            lwat_pad = lwat_pad + lwat_well  # add numpy arrays element by element
-            twat_pad = twat_pad + twat_well  # add numpy arrays element by element
+    Returns:
+        df (DataFrame): One row per well with selected pump and rates
 
-            loil_pad = loil_pad + qoil_lift
-            toil_pad = toil_pad + qoil_totl
+    Raises:
+        ValueError: If any well has no semi-finalists
+        RuntimeError: If the problem is infeasible (capacity too small)
+    """
+    # collect semi-finalist candidates per well
+    candidates = []
+    for well in well_list:
+        df_semi = well.df[well.df["semi"]].reset_index(drop=True)
+        if df_semi.empty:
+            raise ValueError(f"Well '{well.wellname}' has no semi-finalists")
+        candidates.append(df_semi)
 
-        self.mowr_ray = mowr_ray
-        self.lwat_pad = lwat_pad  # rename these?
-        self.twat_pad = twat_pad  # rename these?
+    model = cp_model.CpModel()
 
-        self.loil_pad = loil_pad
-        self.toil_pad = toil_pad
+    # decision variables: x[i][j] = 1 if well i selects semi-finalist j
+    x = []
+    for i, df_semi in enumerate(candidates):
+        well_vars = [model.new_bool_var(f"w{i}_p{j}") for j in range(len(df_semi))]
+        x.append(well_vars)
+        if allow_shutin:
+            model.add_at_most_one(well_vars)
+        else:
+            model.add_exactly_one(well_vars)
 
-        return mowr_ray, lwat_pad, twat_pad
+    # capacity constraint: total water <= qpf_tot
+    capacity_scaled = int(np.floor(qpf_tot * SCALE))
+    water_terms = []
+    for i, df_semi in enumerate(candidates):
+        for j, wat in enumerate(df_semi[water_key]):
+            water_terms.append(int(np.ceil(wat * SCALE)) * x[i][j])
+    model.add(sum(water_terms) <= capacity_scaled)
 
-    def equal_slope(self, qwat_pad: float, water: str) -> float:
-        """Calculate Equal Slope of Wells on Network
+    # objective: maximize total oil
+    oil_terms = []
+    for i, df_semi in enumerate(candidates):
+        for j, oil in enumerate(df_semi["qoil_std"]):
+            oil_terms.append(int(np.floor(oil * SCALE)) * x[i][j])
+    model.maximize(sum(oil_terms))
 
-        Provide the shared water resource of all the wells that are on the
-        same network together. Method will calculate the approximate slope
-        that all the wells should be operating at to evenly distribute water.
+    # solve
+    solver = cp_model.CpSolver()
+    status = solver.solve(model)
 
-        Args:
-            qwat_pad (float): Flow of Water for the Pad / Network, BPD
-            water (str): "lift" or "total" depending on the desired analysis
+    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        min_water = sum(df[water_key].min() for df in candidates)
+        raise RuntimeError(
+            f"MCKP infeasible: {qpf_tot:.0f} bwpd capacity cannot serve all wells. "
+            f"Minimum required: {min_water:.0f} bwpd."
+        )
 
-        Returns:
-            mowr (float): Target Marginal Oil Water Rate for Wells to Operate
-        """
-        water = validate_water(water)
-        self.master_curves()
+    # extract solution
+    results = []
+    for i, (well, df_semi) in enumerate(zip(well_list, candidates)):
+        selected = False
+        for j in range(len(df_semi)):
+            if solver.value(x[i][j]):
+                row = df_semi.iloc[j]
+                results.append(
+                    {
+                        "wellname": well.wellname,
+                        "nozzle": row["nozzle"],
+                        "throat": row["throat"],
+                        "qoil_std": row["qoil_std"],
+                        "lift_wat": row["lift_wat"],
+                        "form_wat": row["form_wat"],
+                        "totl_wat": row["totl_wat"],
+                    }
+                )
+                selected = True
+                break
+        if not selected:
+            results.append(
+                {
+                    "wellname": well.wellname,
+                    "nozzle": "off",
+                    "throat": "off",
+                    "qoil_std": 0.0,
+                    "lift_wat": 0.0,
+                    "form_wat": 0.0,
+                    "totl_wat": 0.0,
+                }
+            )
 
-        # Determine the correct water data and coefficients
-        qwat_ray = self.lwat_pad if water == "lift" else self.twat_pad
-        mowr = np.interp(qwat_pad, np.flip(qwat_ray), np.flip(self.mowr_ray))  # not sorted from largest to smallest...
-        return float(mowr)
-
-    def dist_slope(self, mowr_pad: float, water: str) -> pd.DataFrame:
-        """Distribute the Slope Equally
-
-        Provide a target mowr and constraint on the wells. The method will
-        go through and select all the wells. (Should this just be added to
-        the other method? equal_slope). Ideally you would total up all the
-        wells and look for additional capacity, then go bump that well up.
-
-        Args:
-            mowr_pad (float):
-            water (str): "lift" or "total" depending on the desired analysis
-        """
-        water = validate_water(water)
-        attr_name = "coeff_lift" if water == "lift" else "coeff_totl"
-        col_name = "lift_wat" if water == "lift" else "totl_wat"
-
-        result_list = []
-
-        for well in self.well_list:
-            a, b, c = getattr(well, attr_name)  # pull out exponetial coefficients
-            qwat_tgt = cf.rev_exp_deriv(mowr_pad, b, c)  # target water rate
-
-            # semi is true and the water rate is less than the target rate, is there a way to say
-            # the datapoint that is closer instead of just the one that is less? Will this mess you up?
-            df_semi = well.df[(well.df["semi"] == True) & (well.df[col_name] < qwat_tgt)]  # noqa: E712
-            idx_jp = df_semi[col_name].idmax()  # index the desired jetpump is at
-            row_jp = well.df[idx_jp]
-            row_jp["wellname"] = well.wellname
-
-            result_list.append(row_jp)
-
-        df_net = pd.DataFrame(result_list)
-        self.df = df_net
-        return df_net
-
-    def network_plot_data(self, water: str, curve: bool = False) -> None:
-        """Plot Data
-
-        Plot an array to visualize the performance of all the wells that are
-        on the prescribed network.
-
-        Args:
-            water (str): "lift" or "total" depending on the desired x axis
-            curve (bool): Show the curve fit or not
-        """
-        water = validate_water(water)
-        n_wells = len(self.well_list)  # how many wells are there
-        n_cols = 4
-        n_rows = 1 + ((n_wells - 1) // n_cols)  # integer division
-
-        fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(15, 5 * n_rows))
-
-        axs = axs.flatten() if n_wells > 1 else [axs]  # type: ignore
-        for well, ax in zip(self.well_list, axs):
-            well.plot_data(water, curve, ax)  # type: ignore
-
-        # hide the extra subplots
-        for i in range(len(self.well_list), len(axs)):
-            axs[i].axis("off")  # type: ignore
-
-        plt.show()
-
-    def network_plot_derv(self, water: str) -> None:
-        """Plot Derivative Marginal
-
-        Plot the various wells marginal oil water ratio on one graph
-        to show how the various curves would line up if trying to match
-        the mwor value.
-
-        Args:
-            water (str): "lift" or "total" depending on the desired x axis
-        """
-        water = validate_water(water)
-
-        # add a horizontal line where the pad mwor was calculated to be at
-
-        fig, ax = plt.subplots()
-        cmap = plt.get_cmap("tab20", len(self.well_list))  # generate list of colors to plot
-
-        for i, well in enumerate(self.well_list):
-            well._plot_derv_network(water, ax, mcolor=cmap(i))  # type: ignore
-
-        ax.set_xlabel(f"{water.capitalize()} Water Rate, BWPD")
-        ax.set_ylabel("Marginal Oil Water Rate, Oil BBL / Water BBL")
-        ax.title.set_text("Marginal Network Jet Pump Performance")
-        ax.legend()
-
-        plt.show()
-
-    def network_plot_master(self, water: str) -> None:
-        """Plot Network Master Curves
-
-        Plot the master curve that is produced by adding up.
-
-        Args:
-            water (str): "lift" or "total" depending on the desired x axis
-        """
-        water = validate_water(water)
-        self.master_curves()
-        # Determine the correct water data and coefficients
-        qwat_ray = self.lwat_pad if water == "lift" else self.twat_pad
-        qoil_ray = self.loil_pad if water == "lift" else self.toil_pad
-
-        fig, ax = plt.subplots()
-        ax2 = ax.twinx()
-
-        pri = ax.plot(qwat_ray, self.mowr_ray, color="blue", linestyle="--", label="marginal")
-        sec = ax2.plot(qwat_ray, qoil_ray, color="red", linestyle="--", label="oil")  # type: ignore
-
-        leg_nms = pri + sec
-        labs = [leg.get_label() for leg in leg_nms]
-        ax.legend(leg_nms, labs, loc="center right")
-
-        ax.set_xlabel(f"Network Required {water.capitalize()} Water, BWPD")
-        ax.set_ylabel(f"Network Marginal Oil {water.capitalize()} Water Ratio, bbl oil / bbl water")
-
-        ax2.set_ylabel("Oil Rate, BOPD")
-
-        plt.title(f"{self.pad_name} Pad Master {water.capitalize()} Water Curve")
-        plt.show()
+    return pd.DataFrame(results)

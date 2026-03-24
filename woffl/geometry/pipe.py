@@ -29,6 +29,34 @@ class Pipe:
     def __repr__(self):
         return f"Pipe: Out Dia {self.out_dia} inches and Inn Dia {self.inn_dia} inches"
 
+    @classmethod
+    def four_half_tube(cls):
+        """Four and Half inch tubing
+
+        Generic 4.5 inch production tubing
+
+        Args:
+            out_dia (float): 4.5 inches
+            thick (float): 0.271 inches
+        """
+        return cls(out_dia=4.5, thick=0.271)
+
+    @classmethod
+    def three_half_tube(cls):
+        """Three and Half inch tubing
+
+        Generic 3.5 inch production tubing
+        """
+        return cls(out_dia=3.5, thick=0.271)
+
+    @classmethod
+    def seven_case(cls):
+        """Seven Inch Casing
+
+        Generic 7.0 inch casing
+        """
+        return cls(out_dia=7.0, thick=0.5)
+
     @property
     def inn_area(self) -> float:
         """Inner area of piping, ft2"""
@@ -53,12 +81,13 @@ class Pipe:
         return area
 
 
-class Annulus:
+class PipeInPipe:
     def __init__(self, inn_pipe: Pipe, out_pipe: Pipe) -> None:
-        """Initialize a pipe annulus
+        """Initialize a pipe inside another pipe
 
-        The annulus doesn't have a length. The object will work with the
-        profile class to create an appropriate length and angle of annulus.
+        This class allows creating a tubing and annulus combination. This class
+        is used later when the well is defined as forward or reverse circulating jet pump.
+        Additionally the class is used to calculate friction of the power fluid.
 
         Args:
             inn_pipe (Pipe): Inside Pipe in an annulus set up
@@ -77,11 +106,35 @@ class Annulus:
         return f"Inner Pipe OD: {self.inn_pipe.out_dia} inches, Outer Pipe OD: {self.out_pipe.out_dia} inches"
 
     @property
+    def tube_area(self) -> float:
+        """Tubing Cross Sectional Area, ft2"""
+        return self.inn_pipe.inn_area
+
+    @property
+    def tube_hyd_dia(self) -> float:
+        """Tubing Hydraulic Diameter, inches"""
+        return self.inn_pipe.inn_dia
+
+    @property
+    def tube_abs_ruff(self) -> float:
+        """Tubing Absolute Roughness, inches"""
+        return self.inn_pipe.abs_ruff
+
+    @property
     def ann_area(self) -> float:
         """Annulus Cross Sectional Area, ft2"""
         return self.out_pipe.inn_area - self.inn_pipe.out_area
 
     @property
-    def hyd_dia(self) -> float:
+    def ann_hyd_dia(self) -> float:
         """Annulus Hydraulic Diameter, inches"""
         return self.out_pipe.inn_dia - self.inn_pipe.out_dia
+
+    @property
+    def ann_abs_ruff(self) -> float:
+        """Annulus Absolute Roughness, inches
+
+        Uses the same value for the inside wall of outer pipe and
+        outer wall of the inside pipe
+        """
+        return self.out_pipe.abs_ruff

@@ -3,11 +3,11 @@ requires = ["setuptools>=61.0.0", "wheel"] # creates the "cheese wheel"
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-exclude = ["data"]
+exclude = ["data", "examples"]
 
 [project]
 name = "woffl"
-version = "1.0.20" # bumpver automatically updates
+version = "2.0.2" # bumpver automatically updates
 description = "Water Optimization For Fluid Lift. Numerical solver for liquid powered jet pumps with multiphase flow"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -16,27 +16,28 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Physics",
-    "License :: OSI Approved :: MIT License"
+    "License :: OSI Approved :: GNU Affero General Public License v3"
     ]
 keywords = ["jet pump", "solver", "numerical", "multiphase"]
 dependencies = [
     "matplotlib>=3.8.2",
     "numpy>=1.26.3", 
     "pandas>=2.1.4", # pandas installs numpy, but I might get rid of pandas
-    "scipy>=1.11.4", 
+    "scipy>=1.11.4",
+    "ortools>=9.15" 
 ]
 
 requires-python = ">=3.10" # not sure when type hinting was released
 
 [project.optional-dependencies]
-dev = ["bumpver", "isort", "black"]
+dev = ["bumpver", "isort", "black", "pytest"]
 
 [project.urls]
 Homepage = "https://github.com/kwellis/woffl"
 
 
 [tool.bumpver]
-current_version = "1.0.20" # bumpver update patch
+current_version = "2.0.2" # bumpver update patch
 version_pattern = "MAJOR.MINOR.PATCH"
 # commit_message = "bump version {old_version} -> {new_version}"
 # tag_message = "{new_version}"

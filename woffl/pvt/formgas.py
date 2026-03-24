@@ -23,6 +23,7 @@ class FormGas:
         self.gas_sg = gas_sg
         self.ppc, self.tpc = self._sutton_pseudo_crit(gas_sg)
         self.mw = 28.96443 * gas_sg  # molecular weight
+        self._cache = {}
 
     def __repr__(self):
         return f"Gas: {self.gas_sg} SG and {self.mw} Mol Weight"
@@ -66,8 +67,22 @@ class FormGas:
         """Pure Methane Formation Gas
 
         Args:
-            gas_sg (float): 0.65"""
+            gas_sg (float): 0.55"""
         return cls(gas_sg=0.55)
+
+    def _cached(self, key: str, fn):
+        """Return cached value or compute, cache, and return it.
+
+        Args:
+            key (str): Cache key for the property
+            fn (callable): Zero-argument callable that computes the value
+
+        Returns:
+            Cached or freshly computed value
+        """
+        if key not in self._cache:
+            self._cache[key] = fn()
+        return self._cache[key]
 
     # almost need seperate function to change pressure / temperature
     def condition(self, press, temp):
@@ -89,8 +104,10 @@ class FormGas:
         # not adjusted for non-hydrocarbon gas such as H2S or CO2
         self.ppr = self.pabs / self.ppc  # unitless, pressure pseudo reduced
         self.tpr = self.tabs / self.tpc  # unitless, temperature pseudo reduced
+        self._cache = {}
         return self
 
+    @property
     def zfactor(self) -> float:
         """Gas Z-Factor Compressibility
 
@@ -100,6 +117,10 @@ class FormGas:
         Returns:
             zfactor(float): gas zfactor, no units
         """
+        return self._cached("zfactor", self._compute_zfactor)
+
+    def _compute_zfactor(self) -> float:
+        """Compute gas z-factor without caching."""
         zfactor = self._zfactor_grad_school(self.ppr, self.tpr)
         # zfactor = self._zfactor_dak(self.ppr, self.tpr)
         return zfactor
@@ -114,16 +135,20 @@ class FormGas:
             None
 
         Returns:
-            dgas (float): density of the gas, lbm/ft3
+            rho_gas (float): density of the gas, lbm/ft3
 
         References:
             Fundamental Principles of Reservoir Engineering, B.Towler (2002) Page 16
             Applied Multiphase Flow in Pipes..., Al-Safran and Brill (2017) Page 305
         """
-        zval = self.zfactor()  # call method if it hasn't been already?
-        dgas = self.pabs * self.mw / (zval * FormGas._R * self.tabs)
-        return dgas
+        return self._cached("density", self._compute_density)
 
+    def _compute_density(self) -> float:
+        """Compute gas density without caching."""
+        rho_gas = self.pabs * self.mw / (self.zfactor * FormGas._R * self.tabs)
+        return rho_gas
+
+    @property
     def viscosity(self) -> float:
         """Gas Viscosity, cP
 
@@ -135,9 +160,14 @@ class FormGas:
         Returns:
             ugas (float): gas viscosity, cP
         """
+        return self._cached("viscosity", self._compute_viscosity)
+
+    def _compute_viscosity(self) -> float:
+        """Compute gas viscosity without caching."""
         ug = self._viscosity_lee(self.tabs, self.mw, self.density)
         return ug
 
+    @property
     def compress(self) -> float:
         """Gas Compressibility Isothermal
 
@@ -157,8 +187,8 @@ class FormGas:
         p1 = self.press
         p2 = p1 + 10  # add 100 psi to evaluate a different condition for compressibility
 
-        z1 = self.zfactor()
-        z2 = self.condition(p2, temp).zfactor()
+        z1 = self.zfactor
+        z2 = self.condition(p2, temp).zfactor
 
         cg = 1 / p1 - (1 / z1) * ((z2 - z1) / (p2 - p1))
         return cg

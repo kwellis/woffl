@@ -9,5 +9,5 @@ WellProfile (Class):
 """
 
 from .jetpump import JetPump
-from .pipe import Annulus, Pipe
+from .pipe import Pipe, PipeInPipe
 from .wellprofile import WellProfile

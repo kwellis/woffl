@@ -14,14 +14,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from scipy.optimize import curve_fit, minimize
 
-import woffl.assembly.curvefit as cf
-import woffl.assembly.sysops as so
+import woffl.assembly.solopump as so
 from woffl.flow.inflow import InFlow
 from woffl.geometry.jetpump import JetPump
-from woffl.geometry.pipe import Annulus, Pipe
+from woffl.geometry.pipe import PipeInPipe
 from woffl.geometry.wellprofile import WellProfile
-from woffl.pvt.resmix import ResMix
+from woffl.pvt import FormWater, ResMix
 
 
 @dataclass(frozen=True)
@@ -46,12 +46,13 @@ class BatchPump:
         self,
         pwh: float,
         tsu: float,
-        rho_pf: float,
         ppf_surf: float,
-        wellbore: Pipe,
+        wellbore: PipeInPipe,
         wellprof: WellProfile,
         ipr_su: InFlow,
         prop_su: ResMix,
+        prop_pf: FormWater,
+        jpump_direction: str = "reverse",
         wellname: str = "na",
     ) -> None:
         """Batch Pump Solver
@@ -62,21 +63,24 @@ class BatchPump:
         Args:
             pwh (float): Pressure Wellhead, psig
             tsu (float): Temperature Suction, deg F
-            rho_pf (float): Density of the power fluid, lbm/ft3
             ppf_surf (float): Pressure Power Fluid Surface, psig
-            wellbore (Pipe): Pipe Class of the Wellbore
+            wellbore (PipeInPipe): Pipe Class of the Wellbore
             wellprof (WellProfile): Well Profile Class
             ipr_su (InFlow): Inflow Performance Class
-            prop_su (ResMix): Reservoir Mixture Conditions
+            prop_su (ResMix): Reservoir Mixture Properties
+            prop_pf (FormWater): Powerfluid Properties
+            jpump_direction (str): Jet Pump Direction, "reverse" or "forward"
+            wellname (str): A unique identifier of the wellname
         """
         self.pwh = pwh
         self.tsu = tsu
-        self.rho_pf = rho_pf
         self.ppf_surf = ppf_surf
         self.wellbore = wellbore
         self.wellprof = wellprof
         self.ipr_su = ipr_su
         self.prop_su = prop_su
+        self.prop_pf = prop_pf
+        self.direction = jpump_direction
         self.wellname = wellname
 
     def update_press(self, kind: str, psig: float) -> None:
@@ -127,15 +131,18 @@ class BatchPump:
         """
         jp_list = []
         for nozzle, throat in product(nozzles, throats):
-            jp_list.append(JetPump(nozzle, throat, knz, ken, kth, kdi))
+            # doesn't add jet pumps that don't match the required formatting
+            try:
+                jp_list.append(JetPump(nozzle, throat, knz, ken, kth, kdi))
+            except ValueError:
+                continue
         return jp_list
 
-    def batch_run(self, jetpumps: list[JetPump], debug: bool = False) -> pd.DataFrame:
-        """Batch Run of Jet Pumps
+    def _run_core(self, jetpumps: list[JetPump], debug: bool = False) -> pd.DataFrame:
+        """Core Jet Pump Solver Loop
 
-        Run through multiple different types of jet pumps. Results will be stored in
-        a dataframe where the results can be graphed and selected for the optimal pump.
-        The dataframe is added to the class as a variable for future inspection.
+        Run through multiple jet pumps and return results as a DataFrame
+        without modifying self.df.
 
         Args:
             jetpumps (list): List of JetPumps
@@ -150,13 +157,14 @@ class BatchPump:
                 psu_solv, sonic_status, qoil_std, fwat_bpd, lwat_bpd, mach_te = so.jetpump_solver(
                     self.pwh,
                     self.tsu,
-                    self.rho_pf,
                     self.ppf_surf,
                     jetpump,
                     self.wellbore,
                     self.wellprof,
                     self.ipr_su,
                     self.prop_su,
+                    self.prop_pf,
+                    self.direction,
                 )
                 result = {
                     "nozzle": jetpump.noz_no,
@@ -192,9 +200,58 @@ class BatchPump:
                         "totl_wor": np.nan,
                         "error": exc,
                     }
-            results.append(result)  # add some progress bar code here?
-        self.df = pd.DataFrame(results)
-        return self.df  # should this be returned as none?
+            results.append(result)
+        return pd.DataFrame(results)
+
+    def batch_run(self, jetpumps: list[JetPump], debug: bool = False) -> pd.DataFrame:
+        """Batch Run of Jet Pumps
+
+        Run through multiple different types of jet pumps. Results will be stored in
+        a dataframe where the results can be graphed and selected for the optimal pump.
+        The dataframe is added to the class as a variable for future inspection.
+
+        Args:
+            jetpumps (list): List of JetPumps
+            debug (bool): True - Errors are Raised, False - Errors are Stored
+
+        Returns:
+            df (DataFrame): DataFrame of Jet Pump Results
+        """
+        self.df = self._run_core(jetpumps, debug)
+        return self.df
+
+    def search_run(
+        self, seed: JetPump, lift_cost: float = 0.03, debug: bool = False, method: str = "ratio"
+    ) -> pd.DataFrame:
+        """Search Run using Nelder-Mead
+
+        Find the optimal jet pump using Nelder-Mead optimization. Two methods:
+        - "ratio": optimizes nozzle diameter and throat-to-nozzle ratio, brackets
+            result to nearby catalog pumps and picks the best by net oil rate
+        - "throat": optimizes nozzle and throat diameters independently, snaps
+            result to the nearest catalog pump by Euclidean distance
+
+        The lift_cost penalizes lift water (power fluid) usage. It represents the oil
+        production cost of each barrel of lift water, in bbl oil / bbl lift water. For
+        example, a lift_cost of 0.03 means 3 bbls of oil per 100 bbls of lift water.
+        A higher value favors smaller pumps that use less power fluid. A value of 0.0
+        maximizes oil with no regard for water usage.
+
+        Args:
+            seed (JetPump): Starting jet pump to seed the optimizer
+            lift_cost (float): Lift water penalty, bbl oil / bbl lift water
+            debug (bool): True - Errors are Raised, False - Errors are Stored
+            method (str): "ratio" or "throat"
+
+        Returns:
+            df (DataFrame): DataFrame with optimal pump result and continuous optimum
+        """
+        if method == "ratio":
+            return ratio_run(self, seed, lift_cost, debug)
+        elif method == "throat":
+            return throat_run(self, seed, lift_cost, debug)
+        else:
+            raise ValueError(f"Unknown method '{method}', valid options: 'ratio', 'throat'")
 
     def process_results(self) -> pd.DataFrame:
         """Process Results
@@ -229,33 +286,10 @@ class BatchPump:
 
         self.df = self.df.merge(semi_df[["motwr", "molwr"]], left_index=True, right_index=True, how="left")
 
-        self.coeff_totl = cf.batch_curve_fit(qoil_semi, twat_semi, origin=False)
-        self.coeff_lift = cf.batch_curve_fit(qoil_semi, lwat_semi, origin=False)
+        self.coeff_totl = batch_curve_fit(qoil_semi, twat_semi, origin=False)
+        self.coeff_lift = batch_curve_fit(qoil_semi, lwat_semi, origin=False)
 
         return self.df
-
-    def theory_curves(self, mowr_ray: np.ndarray, water: str) -> tuple[np.ndarray, np.ndarray]:
-        """Theoretical Performace Curves
-
-        Create theoretical jet pump performance curves using marginal oil water rate
-        as the input. Generate arrays of the theoretical oil rat and water rate.
-
-        Args:
-            mowr_ray (np.ndarry): Marginal Oil Water Ratio, bbl/bbl
-            water (str): "lift" or "total" depending on the desired analysis
-
-        Returns:
-            qoil_std (np.ndarray): Oil Rate at different MOWR values
-            qwat_bpd (np.ndarray): Water Rate at different MOWR values
-        """
-        water = validate_water(water)
-        coeff = self.coeff_lift if water == "lift" else self.coeff_totl
-        a, b, c = coeff
-
-        qwat_bpd = np.array([cf.rev_exp_deriv(mowr, b, c) for mowr in mowr_ray])
-        qoil_std = np.array([cf.exp_model(qwat, a, b, c) for qwat in qwat_bpd])
-
-        return qoil_std, qwat_bpd
 
     def plot_data(
         self, water: str, curve: bool = False, ax: Axes | None = None, fig_path: str | os.PathLike | None = None
@@ -345,42 +379,6 @@ class BatchPump:
             plt.savefig(fig_path, dpi=300)
         else:
             plt.show()
-
-    def _plot_derv_network(self, water: str, ax: Axes, mcolor: str | mcolors.Colormap) -> None:
-        """Plot Derivative in a Network
-
-        Plot the derivative results from the jet pump batch run to visualize how
-        well of a match occured between the data and curve for each jet pump
-
-        Args:
-            water (str): "lift" or "total" depending on the desired x axis
-            curve (bool): Show the curve fit or not
-            ax (Axes): Matplotlib axes
-            mcolor (str): Matplotlib color
-        """
-        # Validate the 'water' argument
-        water = validate_water(water)
-        df_semi = self.df[self.df["semi"]]  # filter out the bad parts
-
-        # Determine the correct water data and coefficients
-        marg_semi = df_semi["molwr"] if water == "lift" else df_semi["motwr"]
-        qwat_semi = df_semi["lift_wat"] if water == "lift" else df_semi["totl_wat"]
-        coeff = self.coeff_lift if water == "lift" else self.coeff_totl
-
-        # calling the function to plot the derivatives
-        batch_plot_derv_base(
-            marg_filt=marg_semi,
-            qwat_filt=qwat_semi,
-            nozz_filt=df_semi["nozzle"],
-            thrt_filt=df_semi["throat"],
-            wellname=self.wellname,
-            coeff=coeff,
-            ax=ax,
-            mcolor=mcolor,
-            network=True,
-        )
-
-        return None
 
 
 def validate_water(water: str) -> str:
@@ -525,7 +523,7 @@ def batch_plot_data(
     if coeff is not None:
         a, b, c = coeff  # parse out the coefficients for easier understanding
         fit_water = np.linspace(0, qwat_bpd.max(), 1000)
-        fit_oil = [cf.exp_model(wat, a, b, c) for wat in fit_water]
+        fit_oil = [exp_model(wat, a, b, c) for wat in fit_water]
         ax.plot(fit_water, fit_oil, color="red", linestyle="--", label="Exp. Fit")
 
     ax.set_xlabel(f"{water.capitalize()} Water Rate, BWPD")
@@ -579,7 +577,359 @@ def batch_plot_derv_base(
 
     a, b, c = coeff  # parse out the coefficients for easier understanding
     fit_water = np.linspace(0, qwat_filt.max(), 1000)
-    fit_grad = [cf.exp_deriv(wat, b, c) for wat in fit_water]
+    fit_grad = [exp_deriv(wat, b, c) for wat in fit_water]
     ax.plot(fit_water, fit_grad, color=mcolor, linestyle="--", label=label2)
 
     return None
+
+
+def continuous_jetpump(
+    dnz: float,
+    dth: float,
+    knz: float = 0.01,
+    ken: float = 0.03,
+    kth: float = 0.3,
+    kdi: float = 0.3,
+) -> JetPump:
+    """Create a Jet Pump with Arbitrary Continuous Diameters
+
+    Bypass the catalog lookup in JetPump.__init__ and set nozzle and throat
+    diameters directly. Used by the Nelder-Mead optimizer to evaluate
+    non-catalog pump geometries during the search.
+
+    Args:
+        dnz (float): Nozzle Diameter, inches
+        dth (float): Throat Diameter, inches
+        knz (float): Nozzle Friction Factor, unitless
+        ken (float): Enterance Friction Factor, unitless
+        kth (float): Throat Friction Factor, unitless
+        kdi (float): Diffuser Friction Factor, unitless
+
+    Returns:
+        jp (JetPump): Jet Pump with the specified diameters
+    """
+    jp = object.__new__(JetPump)
+    jp.noz_no = "opt"
+    jp.rat_ar = "opt"
+    jp.knz = knz
+    jp.ken = ken
+    jp.kth = kth
+    jp.kdi = kdi
+    jp.dnz = dnz
+    jp.dth = dth
+    return jp
+
+
+def snap_to_catalog(
+    dnz_opt: float,
+    dth_opt: float,
+    knz: float = 0.01,
+    ken: float = 0.03,
+    kth: float = 0.3,
+    kdi: float = 0.3,
+) -> JetPump:
+    """Snap Continuous Diameters to Nearest Catalog Jet Pump
+
+    Find the valid nozzle and area ratio combination whose diameters are
+    closest (Euclidean distance) to the continuous optimum. Searches all
+    valid nozzle/area_ratio pairs in the Champion X catalog.
+
+    Args:
+        dnz_opt (float): Optimal Nozzle Diameter, inches
+        dth_opt (float): Optimal Throat Diameter, inches
+        knz (float): Nozzle Friction Factor, unitless
+        ken (float): Enterance Friction Factor, unitless
+        kth (float): Throat Friction Factor, unitless
+        kdi (float): Diffuser Friction Factor, unitless
+
+    Returns:
+        jp (JetPump): Nearest valid catalog Jet Pump
+    """
+    noz_dia = np.array(JetPump.nozzle_dia)
+    thr_dia = np.array(JetPump.throat_dia)
+
+    # snap nozzle first, then find best valid throat ratio
+    noz_idx = np.argmin((noz_dia - dnz_opt) ** 2)
+
+    best_letter = min(
+        JetPump.area_code,
+        key=lambda j: (
+            (thr_dia[noz_idx + JetPump.area_code[j]] - dth_opt) ** 2
+            if 0 <= noz_idx + JetPump.area_code[j] < len(thr_dia)
+            else np.inf
+        ),
+    )
+
+    return JetPump(str(noz_idx + 1), best_letter, knz, ken, kth, kdi)
+
+
+def bracket_to_catalog(
+    dnz_opt: float,
+    dth_opt: float,
+    knz: float = 0.01,
+    ken: float = 0.03,
+    kth: float = 0.3,
+    kdi: float = 0.3,
+) -> list[JetPump]:
+    """Bracket Continuous Diameters with Catalog Jet Pumps
+
+    Find the two catalog nozzle sizes and two catalog throat sizes that
+    bracket the continuous optimum diameters. Create jet pumps from
+    the product of these boundaries, keeping only combinations that map
+    to a valid catalog nozzle/throat letter (X through E).
+
+    Args:
+        dnz_opt (float): Optimal Nozzle Diameter, inches
+        dth_opt (float): Optimal Throat Diameter, inches
+        knz (float): Nozzle Friction Factor, unitless
+        ken (float): Enterance Friction Factor, unitless
+        kth (float): Throat Friction Factor, unitless
+        kdi (float): Diffuser Friction Factor, unitless
+
+    Returns:
+        jp_list (list): Bracket JetPumps with valid catalog combos
+    """
+    noz_dia = np.array(JetPump.nozzle_dia)
+    thr_dia = np.array(JetPump.throat_dia)
+
+    # find two nozzle sizes bracketing dnz_opt
+    noz_hi = int(np.searchsorted(noz_dia, dnz_opt, side="left"))
+    noz_lo = max(noz_hi - 1, 0)
+    noz_hi = min(noz_hi, len(noz_dia) - 1)
+
+    # find two throat sizes bracketing dth_opt
+    thr_hi = int(np.searchsorted(thr_dia, dth_opt, side="left"))
+    thr_lo = max(thr_hi - 1, 0)
+    thr_hi = min(thr_hi, len(thr_dia) - 1)
+
+    noz_set = sorted(set([noz_lo, noz_hi]))
+    thr_set = sorted(set([thr_lo, thr_hi]))
+
+    # reverse lookup: area_code offset -> letter
+    offset_to_letter = {v: k for k, v in JetPump.area_code.items()}
+
+    jp_list = []
+    for ni, ti in product(noz_set, thr_set):
+        offset = ti - ni
+        letter = offset_to_letter.get(offset)
+        if letter is None:
+            continue  # not a valid catalog combo
+        try:
+            jp_list.append(JetPump(str(ni + 1), letter, knz, ken, kth, kdi))
+        except ValueError:
+            continue  # out of catalog range
+
+    return jp_list
+
+
+def throat_run(
+    bp: "BatchPump",
+    seed: JetPump,
+    lift_cost: float = 0.03,
+    debug: bool = False,
+) -> pd.DataFrame:
+    """Throat Run using Nelder-Mead
+
+    Use Nelder-Mead to find the continuous nozzle and throat diameters that maximize
+    net oil rate for the given well conditions. The optimal continuous diameters are
+    then snapped to the nearest catalog jet pump.
+
+    Args:
+        bp (BatchPump): BatchPump instance with well configuration
+        seed (JetPump): Starting jet pump to seed the optimizer
+        lift_cost (float): Lift water penalty, bbl oil / bbl lift water
+        debug (bool): True - Errors are Raised, False - Errors are Stored
+
+    Returns:
+        df (DataFrame): DataFrame with the catalog pump result and continuous optimum
+    """
+
+    def objective(x):
+        dnz, dth = x
+        if dth <= dnz:
+            return 1e10
+        jp = continuous_jetpump(dnz, dth, seed.knz, seed.ken, seed.kth, seed.kdi)
+        try:
+            _, _, qoil, _, lwat, _ = so.jetpump_solver(
+                bp.pwh,
+                bp.tsu,
+                bp.ppf_surf,
+                jp,
+                bp.wellbore,
+                bp.wellprof,
+                bp.ipr_su,
+                bp.prop_su,
+                bp.prop_pf,
+                bp.direction,
+            )
+            return -(qoil - lift_cost * lwat)
+        except Exception:
+            return 1e10
+
+    x0 = [seed.dnz, seed.dth]
+    bounds = [
+        (JetPump.nozzle_dia[0], JetPump.nozzle_dia[-1]),
+        (JetPump.throat_dia[0], JetPump.throat_dia[-1]),
+    ]
+
+    result = minimize(objective, x0, method="Nelder-Mead", bounds=bounds)
+    dnz_opt, dth_opt = result.x
+
+    best_jp = snap_to_catalog(dnz_opt, dth_opt, seed.knz, seed.ken, seed.kth, seed.kdi)
+
+    df = bp._run_core([best_jp], debug)
+    df["dnz_opt"] = dnz_opt
+    df["dth_opt"] = dth_opt
+
+    return df
+
+
+def ratio_run(
+    bp: "BatchPump",
+    seed: JetPump,
+    lift_cost: float = 0.03,
+    debug: bool = False,
+) -> pd.DataFrame:
+    """Ratio Run using Nelder-Mead
+
+    Use Nelder-Mead to find the optimal nozzle diameter and throat-to-nozzle
+    diameter ratio. Tolerances are relaxed since we only need to land between
+    two catalog sizes. The continuous optimum is then bracketed by the nearest
+    catalog nozzle/throat combinations that form valid catalog pumps. The best
+    performer by net oil rate is selected.
+
+    Args:
+        bp (BatchPump): BatchPump instance with well configuration
+        seed (JetPump): Starting jet pump to seed the optimizer
+        lift_cost (float): Lift water penalty, bbl oil / bbl lift water
+        debug (bool): True - Errors are Raised, False - Errors are Stored
+
+    Returns:
+        df (DataFrame): DataFrame with bracket pump result and continuous optimum
+    """
+
+    def objective(x):
+        dnz, thr_ratio = x
+        dth = dnz * thr_ratio
+        jp = continuous_jetpump(dnz, dth, seed.knz, seed.ken, seed.kth, seed.kdi)
+        try:
+            _, _, qoil, _, lwat, _ = so.jetpump_solver(
+                bp.pwh,
+                bp.tsu,
+                bp.ppf_surf,
+                jp,
+                bp.wellbore,
+                bp.wellprof,
+                bp.ipr_su,
+                bp.prop_su,
+                bp.prop_pf,
+                bp.direction,
+            )
+            return -(qoil - lift_cost * lwat)
+        except Exception:
+            return 1e10
+
+    thr_ratio_0 = seed.dth / seed.dnz
+    x0 = [seed.dnz, thr_ratio_0]
+
+    ratio_vals = list(JetPump.ratio_size.values())
+    bounds = [
+        (JetPump.nozzle_dia[0], JetPump.nozzle_dia[-1]),
+        (min(ratio_vals), max(ratio_vals)),
+    ]
+
+    # relaxed tolerances — only need to land between two catalog sizes
+    result = minimize(
+        objective,
+        x0,
+        method="Nelder-Mead",
+        bounds=bounds,
+        options={"fatol": 1.0},
+    )
+    dnz_opt, ratio_opt = result.x
+    dth_opt = dnz_opt * ratio_opt
+
+    candidates = bracket_to_catalog(dnz_opt, dth_opt, seed.knz, seed.ken, seed.kth, seed.kdi)
+
+    df = bp._run_core(candidates, debug)
+
+    # pick best by net oil rate
+    net_oil = df["qoil_std"] - lift_cost * df["lift_wat"]
+    best_idx = net_oil.idxmax()
+    df = df.loc[[best_idx]].reset_index(drop=True)
+
+    df["dnz_opt"] = dnz_opt
+    df["dth_opt"] = dth_opt
+    df["ratio_opt"] = ratio_opt
+
+    return df
+
+
+def exp_model(x: float, a: float, b: float, c: float) -> float:
+    """Exponential Curve Fit
+
+    Args:
+        x (float): Water Rate, bwpd
+        a (float): Asymptote of the Curve
+        b (float): Constant
+        c (float): Constant
+
+    Returns
+        y (float): Oil Rate, bopd
+    """
+    return a - b * np.exp(-c * x)
+
+
+def exp_deriv(x: float, b: float, c: float) -> float:
+    """Derivative of Exponential Curve Fit
+
+    Args:
+        x (float): Water Rate, bwpd
+        b (float): Constant
+        c (float): Constant
+
+    Returns
+        s (float): Marginal Oil - Water Ratio, bbl/bbl
+    """
+    return c * b * np.exp(-c * x)
+
+
+def rev_exp_deriv(s: float, b: float, c: float) -> float:
+    """Reverse Derivative of Exponential Curve Fit
+
+    Args:
+        s (float): Marginal Oil - Water Ratio, bbl/bbl
+        b (float): Constant
+        c (float): Constant
+
+    Returns
+        x (float): Water Rate, bwpd
+    """
+    if s == 0:
+        s = 0.00001
+    x = -1 / c * np.log(s / (c * b))
+    x = max(x, 0)  # make sure s doesn't drop below zero
+    return x
+
+
+def batch_curve_fit(qoil_filt: np.ndarray, qwat_filt: np.ndarray, origin: bool = True) -> tuple[float, float, float]:
+    """Batch Curve Fit
+
+    Curve fit the filtered datapoints from the Batch Results
+
+    Args:
+        qoil_filt (list): Filtered Oil Array, bopd
+        qwat_filt (list): Filtered Water Array, bwpd
+        origin (bool): Add point to encourage intercepting at (0,0)
+
+    Returns:
+        coeff (float): a, b and c coefficients for curve fit
+    """
+    # add a point at 0,0 to force intercepting origin
+    if origin:
+        qoil_filt = np.append(qoil_filt, 0.0)
+        qwat_filt = np.append(qwat_filt, 0.0)
+
+    initial_guesses = [max(qoil_filt), max(qoil_filt), 0.001]
+    coeff, _ = curve_fit(exp_model, qwat_filt, qoil_filt, p0=initial_guesses)
+    return coeff
