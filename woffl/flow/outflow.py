@@ -172,22 +172,22 @@ def production_top_down_press(
         area = wellbore.ann_area
         abs_ruff = wellbore.ann_abs_ruff
 
-    prs_ray = np.array([ptop])
-    slh_ray = np.array([])
+    prs_list = [ptop]
+    slh_list = []
     md_seg, vd_seg = wellprof.outflow_spacing(100)  # space every 100'
     md_diff = np.diff(md_seg, n=1) * -1  # against flow
     vd_diff = np.diff(vd_seg, n=1) * -1  # going down piping
-    n = 0
     for length, height in zip(md_diff, vd_diff):
         dp_stat, dp_fric, slh = beggs_diff_press(
-            prs_ray[-1], ttop, hyd_dia, area, abs_ruff, length, height, qoil_std, prop
+            prs_list[-1], ttop, hyd_dia, area, abs_ruff, length, height, qoil_std, prop
         )
-        pdwn = prs_ray[-1] - dp_stat - dp_fric  # dp is subtracted
-        prs_ray = np.append(prs_ray, pdwn)
-        slh_ray = np.append(slh_ray, slh)
-        n = n + 1
+        pdwn = prs_list[-1] - dp_stat - dp_fric  # dp is subtracted
+        prs_list.append(pdwn)
+        slh_list.append(slh)
     # the no slip array is going to be one shorter than the md_seg and prs_ray...
     # i'm not sure if this is problem that I should "fix" later?
+    prs_ray = np.array(prs_list)
+    slh_ray = np.array(slh_list)
     return md_seg, prs_ray, slh_ray
 
 
@@ -234,22 +234,22 @@ def production_bottom_up_press(
         area = wellbore.ann_area
         abs_ruff = wellbore.ann_abs_ruff
 
-    prs_ray = np.array([pbot])
-    slh_ray = np.array([])
+    prs_list = [pbot]
+    slh_list = []
     md_seg, vd_seg = wellprof.outflow_spacing(100)  # space every 100'
     md_diff = np.diff(md_seg, n=1)  # with the flow
     vd_diff = np.diff(vd_seg, n=1)  # going up piping
-    n = 0
     for length, height in zip(np.flip(md_diff), np.flip(vd_diff)):  # start at bottom
         dp_stat, dp_fric, slh = beggs_diff_press(
-            prs_ray[-1], tbot, hyd_dia, area, abs_ruff, length, height, qoil_std, prop
+            prs_list[-1], tbot, hyd_dia, area, abs_ruff, length, height, qoil_std, prop
         )
-        pdwn = prs_ray[-1] - dp_stat - dp_fric  # dp is subtracted
-        prs_ray = np.append(prs_ray, pdwn)
-        slh_ray = np.append(slh_ray, slh)
-        n = n + 1
+        pdwn = prs_list[-1] - dp_stat - dp_fric  # dp is subtracted
+        prs_list.append(pdwn)
+        slh_list.append(slh)
     # the no slip array is going to be one shorter than the md_seg and prs_ray...
     # i'm not sure if this is problem that I should "fix" later?
+    prs_ray = np.array(prs_list)
+    slh_ray = np.array(slh_list)
     return md_seg, prs_ray, slh_ray
 
 

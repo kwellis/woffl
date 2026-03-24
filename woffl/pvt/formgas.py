@@ -23,6 +23,7 @@ class FormGas:
         self.gas_sg = gas_sg
         self.ppc, self.tpc = self._sutton_pseudo_crit(gas_sg)
         self.mw = 28.96443 * gas_sg  # molecular weight
+        self._cache = {}
 
     def __repr__(self):
         return f"Gas: {self.gas_sg} SG and {self.mw} Mol Weight"
@@ -69,6 +70,20 @@ class FormGas:
             gas_sg (float): 0.55"""
         return cls(gas_sg=0.55)
 
+    def _cached(self, key: str, fn):
+        """Return cached value or compute, cache, and return it.
+
+        Args:
+            key (str): Cache key for the property
+            fn (callable): Zero-argument callable that computes the value
+
+        Returns:
+            Cached or freshly computed value
+        """
+        if key not in self._cache:
+            self._cache[key] = fn()
+        return self._cache[key]
+
     # almost need seperate function to change pressure / temperature
     def condition(self, press, temp):
         """Set condition of evaluation
@@ -89,6 +104,7 @@ class FormGas:
         # not adjusted for non-hydrocarbon gas such as H2S or CO2
         self.ppr = self.pabs / self.ppc  # unitless, pressure pseudo reduced
         self.tpr = self.tabs / self.tpc  # unitless, temperature pseudo reduced
+        self._cache = {}
         return self
 
     @property
@@ -101,6 +117,10 @@ class FormGas:
         Returns:
             zfactor(float): gas zfactor, no units
         """
+        return self._cached("zfactor", self._compute_zfactor)
+
+    def _compute_zfactor(self) -> float:
+        """Compute gas z-factor without caching."""
         zfactor = self._zfactor_grad_school(self.ppr, self.tpr)
         # zfactor = self._zfactor_dak(self.ppr, self.tpr)
         return zfactor
@@ -121,6 +141,10 @@ class FormGas:
             Fundamental Principles of Reservoir Engineering, B.Towler (2002) Page 16
             Applied Multiphase Flow in Pipes..., Al-Safran and Brill (2017) Page 305
         """
+        return self._cached("density", self._compute_density)
+
+    def _compute_density(self) -> float:
+        """Compute gas density without caching."""
         rho_gas = self.pabs * self.mw / (self.zfactor * FormGas._R * self.tabs)
         return rho_gas
 
@@ -136,6 +160,10 @@ class FormGas:
         Returns:
             ugas (float): gas viscosity, cP
         """
+        return self._cached("viscosity", self._compute_viscosity)
+
+    def _compute_viscosity(self) -> float:
+        """Compute gas viscosity without caching."""
         ug = self._viscosity_lee(self.tabs, self.mw, self.density)
         return ug
 
