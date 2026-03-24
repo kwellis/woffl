@@ -131,7 +131,11 @@ class BatchPump:
         """
         jp_list = []
         for nozzle, throat in product(nozzles, throats):
-            jp_list.append(JetPump(nozzle, throat, knz, ken, kth, kdi))
+            # doesn't add jet pumps that don't match the required formatting
+            try:
+                jp_list.append(JetPump(nozzle, throat, knz, ken, kth, kdi))
+            except ValueError:
+                continue
         return jp_list
 
     def _run_core(self, jetpumps: list[JetPump], debug: bool = False) -> pd.DataFrame:
@@ -216,13 +220,16 @@ class BatchPump:
         self.df = self._run_core(jetpumps, debug)
         return self.df
 
-    def search_run(self, seed: JetPump, lift_cost: float = 0.03, debug: bool = False) -> pd.DataFrame:
+    def search_run(
+        self, seed: JetPump, lift_cost: float = 0.03, debug: bool = False, method: str = "ratio"
+    ) -> pd.DataFrame:
         """Search Run using Nelder-Mead
 
-        Use Nelder-Mead to find the continuous nozzle and throat diameters that maximize
-        oil rate for the given well conditions. The optimal continuous diameters are then
-        snapped to the nearest catalog jet pump. The final result is the actual performance
-        of that catalog pump, solved through the full wellbore physics.
+        Find the optimal jet pump using Nelder-Mead optimization. Two methods:
+        - "ratio": optimizes nozzle diameter and throat-to-nozzle ratio, brackets
+            result to nearby catalog pumps and picks the best by net oil rate
+        - "throat": optimizes nozzle and throat diameters independently, snaps
+            result to the nearest catalog pump by Euclidean distance
 
         The lift_cost penalizes lift water (power fluid) usage. It represents the oil
         production cost of each barrel of lift water, in bbl oil / bbl lift water. For
@@ -234,52 +241,17 @@ class BatchPump:
             seed (JetPump): Starting jet pump to seed the optimizer
             lift_cost (float): Lift water penalty, bbl oil / bbl lift water
             debug (bool): True - Errors are Raised, False - Errors are Stored
+            method (str): "ratio" or "throat"
 
         Returns:
-            df (DataFrame): DataFrame with the catalog pump result and continuous optimum
+            df (DataFrame): DataFrame with optimal pump result and continuous optimum
         """
-
-        def objective(x):
-            dnz, dth = x
-            if dth <= dnz:
-                return 1e10
-            jp = continuous_jetpump(dnz, dth, seed.knz, seed.ken, seed.kth, seed.kdi)
-            try:
-                _, _, qoil, _, lwat, _ = so.jetpump_solver(
-                    self.pwh,
-                    self.tsu,
-                    self.ppf_surf,
-                    jp,
-                    self.wellbore,
-                    self.wellprof,
-                    self.ipr_su,
-                    self.prop_su,
-                    self.prop_pf,
-                    self.direction,
-                )
-                return -(qoil - lift_cost * lwat)
-            except Exception:
-                return 1e10
-
-        x0 = [seed.dnz, seed.dth]
-        bounds = [
-            (JetPump.nozzle_dia[0], JetPump.nozzle_dia[-1]),
-            (JetPump.throat_dia[0], JetPump.throat_dia[-1]),
-        ]
-
-        result = minimize(objective, x0, method="Nelder-Mead", bounds=bounds)
-        dnz_opt, dth_opt = result.x
-
-        # snap to the nearest catalog jet pump and run the actual physics
-        best_jp = snap_to_catalog(dnz_opt, dth_opt, seed.knz, seed.ken, seed.kth, seed.kdi)
-
-        df = self._run_core([best_jp], debug)
-
-        # store the continuous optimum for reference
-        df["dnz_opt"] = dnz_opt
-        df["dth_opt"] = dth_opt
-
-        return df
+        if method == "ratio":
+            return ratio_run(self, seed, lift_cost, debug)
+        elif method == "throat":
+            return throat_run(self, seed, lift_cost, debug)
+        else:
+            raise ValueError(f"Unknown method '{method}', valid options: 'ratio', 'throat'")
 
     def process_results(self) -> pd.DataFrame:
         """Process Results
@@ -689,6 +661,189 @@ def snap_to_catalog(
     )
 
     return JetPump(str(noz_idx + 1), best_letter, knz, ken, kth, kdi)
+
+
+def bracket_to_catalog(
+    dnz_opt: float,
+    dth_opt: float,
+    knz: float = 0.01,
+    ken: float = 0.03,
+    kth: float = 0.3,
+    kdi: float = 0.3,
+) -> list[JetPump]:
+    """Bracket Continuous Diameters with Catalog Jet Pumps
+
+    Find the two catalog nozzle sizes and two catalog throat sizes that
+    bracket the continuous optimum diameters. Create jet pumps from
+    the product of these boundaries, keeping only combinations that map
+    to a valid catalog nozzle/throat letter (X through E).
+
+    Args:
+        dnz_opt (float): Optimal Nozzle Diameter, inches
+        dth_opt (float): Optimal Throat Diameter, inches
+        knz (float): Nozzle Friction Factor, unitless
+        ken (float): Enterance Friction Factor, unitless
+        kth (float): Throat Friction Factor, unitless
+        kdi (float): Diffuser Friction Factor, unitless
+
+    Returns:
+        jp_list (list): Bracket JetPumps with valid catalog combos
+    """
+    noz_dia = np.array(JetPump.nozzle_dia)
+    thr_dia = np.array(JetPump.throat_dia)
+
+    # find two nozzle sizes bracketing dnz_opt
+    noz_hi = int(np.searchsorted(noz_dia, dnz_opt, side="left"))
+    noz_lo = max(noz_hi - 1, 0)
+    noz_hi = min(noz_hi, len(noz_dia) - 1)
+
+    # find two throat sizes bracketing dth_opt
+    thr_hi = int(np.searchsorted(thr_dia, dth_opt, side="left"))
+    thr_lo = max(thr_hi - 1, 0)
+    thr_hi = min(thr_hi, len(thr_dia) - 1)
+
+    noz_set = sorted(set([noz_lo, noz_hi]))
+    thr_set = sorted(set([thr_lo, thr_hi]))
+
+    # reverse lookup: area_code offset -> letter
+    offset_to_letter = {v: k for k, v in JetPump.area_code.items()}
+
+    jp_list = []
+    for ni, ti in product(noz_set, thr_set):
+        offset = ti - ni
+        letter = offset_to_letter.get(offset)
+        if letter is None:
+            continue  # not a valid catalog combo
+        try:
+            jp_list.append(JetPump(str(ni + 1), letter, knz, ken, kth, kdi))
+        except ValueError:
+            continue  # out of catalog range
+
+    return jp_list
+
+
+def throat_run(
+    bp: "BatchPump",
+    seed: JetPump,
+    lift_cost: float = 0.03,
+    debug: bool = False,
+) -> pd.DataFrame:
+    """Throat Run using Nelder-Mead
+
+    Use Nelder-Mead to find the continuous nozzle and throat diameters that maximize
+    net oil rate for the given well conditions. The optimal continuous diameters are
+    then snapped to the nearest catalog jet pump.
+
+    Args:
+        bp (BatchPump): BatchPump instance with well configuration
+        seed (JetPump): Starting jet pump to seed the optimizer
+        lift_cost (float): Lift water penalty, bbl oil / bbl lift water
+        debug (bool): True - Errors are Raised, False - Errors are Stored
+
+    Returns:
+        df (DataFrame): DataFrame with the catalog pump result and continuous optimum
+    """
+
+    def objective(x):
+        dnz, dth = x
+        if dth <= dnz:
+            return 1e10
+        jp = continuous_jetpump(dnz, dth, seed.knz, seed.ken, seed.kth, seed.kdi)
+        try:
+            _, _, qoil, _, lwat, _ = so.jetpump_solver(
+                bp.pwh, bp.tsu, bp.ppf_surf, jp, bp.wellbore, bp.wellprof,
+                bp.ipr_su, bp.prop_su, bp.prop_pf, bp.direction,
+            )
+            return -(qoil - lift_cost * lwat)
+        except Exception:
+            return 1e10
+
+    x0 = [seed.dnz, seed.dth]
+    bounds = [
+        (JetPump.nozzle_dia[0], JetPump.nozzle_dia[-1]),
+        (JetPump.throat_dia[0], JetPump.throat_dia[-1]),
+    ]
+
+    result = minimize(objective, x0, method="Nelder-Mead", bounds=bounds)
+    dnz_opt, dth_opt = result.x
+
+    best_jp = snap_to_catalog(dnz_opt, dth_opt, seed.knz, seed.ken, seed.kth, seed.kdi)
+
+    df = bp._run_core([best_jp], debug)
+    df["dnz_opt"] = dnz_opt
+    df["dth_opt"] = dth_opt
+
+    return df
+
+
+def ratio_run(
+    bp: "BatchPump",
+    seed: JetPump,
+    lift_cost: float = 0.03,
+    debug: bool = False,
+) -> pd.DataFrame:
+    """Ratio Run using Nelder-Mead
+
+    Use Nelder-Mead to find the optimal nozzle diameter and throat-to-nozzle
+    diameter ratio. Tolerances are relaxed since we only need to land between
+    two catalog sizes. The continuous optimum is then bracketed by the nearest
+    catalog nozzle/throat combinations that form valid catalog pumps. The best
+    performer by net oil rate is selected.
+
+    Args:
+        bp (BatchPump): BatchPump instance with well configuration
+        seed (JetPump): Starting jet pump to seed the optimizer
+        lift_cost (float): Lift water penalty, bbl oil / bbl lift water
+        debug (bool): True - Errors are Raised, False - Errors are Stored
+
+    Returns:
+        df (DataFrame): DataFrame with bracket pump result and continuous optimum
+    """
+
+    def objective(x):
+        dnz, thr_ratio = x
+        dth = dnz * thr_ratio
+        jp = continuous_jetpump(dnz, dth, seed.knz, seed.ken, seed.kth, seed.kdi)
+        try:
+            _, _, qoil, _, lwat, _ = so.jetpump_solver(
+                bp.pwh, bp.tsu, bp.ppf_surf, jp, bp.wellbore, bp.wellprof,
+                bp.ipr_su, bp.prop_su, bp.prop_pf, bp.direction,
+            )
+            return -(qoil - lift_cost * lwat)
+        except Exception:
+            return 1e10
+
+    thr_ratio_0 = seed.dth / seed.dnz
+    x0 = [seed.dnz, thr_ratio_0]
+
+    ratio_vals = list(JetPump.ratio_size.values())
+    bounds = [
+        (JetPump.nozzle_dia[0], JetPump.nozzle_dia[-1]),
+        (min(ratio_vals), max(ratio_vals)),
+    ]
+
+    # relaxed tolerances — only need to land between two catalog sizes
+    result = minimize(
+        objective, x0, method="Nelder-Mead", bounds=bounds,
+        options={"fatol": 1.0},
+    )
+    dnz_opt, ratio_opt = result.x
+    dth_opt = dnz_opt * ratio_opt
+
+    candidates = bracket_to_catalog(dnz_opt, dth_opt, seed.knz, seed.ken, seed.kth, seed.kdi)
+
+    df = bp._run_core(candidates, debug)
+
+    # pick best by net oil rate
+    net_oil = df["qoil_std"] - lift_cost * df["lift_wat"]
+    best_idx = net_oil.idxmax()
+    df = df.loc[[best_idx]].reset_index(drop=True)
+
+    df["dnz_opt"] = dnz_opt
+    df["dth_opt"] = dth_opt
+    df["ratio_opt"] = ratio_opt
+
+    return df
 
 
 def exp_model(x: float, a: float, b: float, c: float) -> float:
