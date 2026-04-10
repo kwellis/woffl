@@ -7,7 +7,7 @@ exclude = ["data", "examples"]
 
 [project]
 name = "woffl"
-version = "2.0.2" # bumpver automatically updates
+version = "2.0.3" # bumpver automatically updates
 description = "Water Optimization For Fluid Lift. Numerical solver for liquid powered jet pumps with multiphase flow"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -37,7 +37,7 @@ Homepage = "https://github.com/kwellis/woffl"
 
 
 [tool.bumpver]
-current_version = "2.0.2" # bumpver update patch
+current_version = "2.0.3" # bumpver update patch
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump version {old_version} -> {new_version}"
 tag_message = "{new_version}"
