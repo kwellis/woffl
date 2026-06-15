@@ -497,9 +497,10 @@ class BlackOil:
             - Coefficient of Isothermal Compressibility of Black Oil, McCain, Rollins, Villena (1988) SPE-15664-PA
         """
         # gas_sg isn't used, eqn 4 in paper takes oil bubblepoint as input
-        pa = press + 14.7
+        pa = press + 14.7  # pressure absolute
+        ta = temp + 459.67  # temp absolute
         co = math.exp(
-            -7.633 - 1.497 * math.log(pa) + 1.115 * math.log(temp) + 0.533 * math.log(oil_api) + 0.184 * math.log(rs)
+            -7.633 - 1.497 * math.log(pa) + 1.115 * math.log(ta) + 0.533 * math.log(oil_api) + 0.184 * math.log(rs)
         )
         return co
 
