@@ -243,7 +243,7 @@ def jetpump_solver(
     n = 0  # loop counter
 
     while abs(psu_list[-2] - psu_list[-1]) > psu_diff:
-        psu_nxt = jf.psu_secant(psu_list[0], psu_list[1], res_list[0], res_list[1])
+        psu_nxt = jf.psu_secant(psu_list[-2], psu_list[-1], res_list[-2], res_list[-1])
         res_nxt, qoil_std, fwat_bwpd, qnz_bwpd, mach_te = discharge_residual(
             psu_nxt, pwh, tsu, ppf_surf, jpump, wellbore, wellprof, ipr_su, prop_su, prop_pf, jpump_direction
         )
